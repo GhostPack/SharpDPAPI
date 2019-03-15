@@ -18,6 +18,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
   * [Background](#background)
     + [Command Line Usage](#command-line-usage)
     + [Operational Usage](#operational-usage)
+    + [Cobalt Strike Usage](#cobalt-strike-usage)
   * [Commands](#commands)
     + [backupkey](#backupkey)
     + [masterkeys](#masterkeys)
@@ -83,6 +84,15 @@ If domain admin (or equivalent) privileges have been obtained, the domain DPAPI 
 If DA privileges have not been achieved, using Mimikatz' `sekurlsa::dpapi` command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys on a given system (tip: running `dpapi::cache` after key extraction will give you a nice table). If you change these keys to a `{GUID1}:SHA1 {GUID2}:SHA1...` type format, they can be supplied to the [credentials](#credentials) or [vaults](#vaults) commands. This lets you triage all Credential files\Vaults on a system for any user who's currently logged in, without having to do file by file decrypts.
 
 For more offensive DPAPI information, [check here](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/).
+
+
+### Cobalt Strike Usage
+
+SharpDPAPI has an Aggressor script (**SharpDPAPI.cna**) that automates the usage of SharpDPAPI through Cobalt Strike. Before usage, replace `$SharpDPAPI::AssemblyPath` in the .cna with the location of your compiled SharpDPAPI assembly.
+
+Loading **SharpDPAPI.cna** will register a new **sharpDPAPI** Beacon command. If **beacon> sharpDPAPI -dump** is run, the current Beacon will execute `sekurlsa::dpapi` Mimikatz command to extract any DPAPI keys from LSASS (assuming elevation) followed by `dpapi::cache` to display the {GUID}:SHA1 mappings. The decrypted master key SHA1s are stored in the credential store.
+
+Running **beacon> sharpDPAPI** will execute SharpDPAPI with the `triage` command with any GUID:SHA1 masterkey mappings extracted for that host.This allows for effective triage of all Credentials and Vaults on a host _for any currently logged in users_.
 
 
 ## Commands
