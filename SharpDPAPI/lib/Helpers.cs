@@ -61,5 +61,29 @@ namespace SharpDPAPI
             WindowsPrincipal principal = new WindowsPrincipal(identity);
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
+
+        public static int ArrayIndexOf(byte[] arrayToSearchThrough, byte[] patternToFind, int offset = 0)
+        {
+            // helper to search for byte array patterns in another byte array
+            if (patternToFind.Length > arrayToSearchThrough.Length)
+                return -1;
+            for (int i = offset; i < arrayToSearchThrough.Length - patternToFind.Length; i++)
+            {
+                bool found = true;
+                for (int j = 0; j < patternToFind.Length; j++)
+                {
+                    if (arrayToSearchThrough[i + j] != patternToFind[j])
+                    {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
     }
 }

@@ -16,7 +16,7 @@ namespace SharpDPAPI
             Console.WriteLine(" (_  |_   _. ._ ._  | \\ |_) /\\  |_) |  ");
             Console.WriteLine(" __) | | (_| |  |_) |_/ |  /--\\ |  _|_ ");
             Console.WriteLine("                |                      ");
-            Console.WriteLine("  v1.1                                 \r\n");
+            Console.WriteLine("  v1.1.1                               \r\n");
         }
 
         static void Usage()

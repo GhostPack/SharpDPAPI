@@ -204,13 +204,21 @@ namespace SharpDPAPI
             {
                 ArrayList keys = ParseDecPolicyBlob(plaintextBytes);
 
-                string aes128KeyStr = BitConverter.ToString((byte[])keys[0]).Replace("-", "");
-                Console.WriteLine("    aes128 key       : {0}", aes128KeyStr);
+                if (keys.Count == 2)
+                {
+                    string aes128KeyStr = BitConverter.ToString((byte[])keys[0]).Replace("-", "");
+                    Console.WriteLine("    aes128 key       : {0}", aes128KeyStr);
 
-                string aes256KeyStr = BitConverter.ToString((byte[])keys[1]).Replace("-", "");
-                Console.WriteLine("    aes256 key       : {0}", aes256KeyStr);
+                    string aes256KeyStr = BitConverter.ToString((byte[])keys[1]).Replace("-", "");
+                    Console.WriteLine("    aes256 key       : {0}", aes256KeyStr);
 
-                return keys;
+                    return keys;
+                }
+                else
+                {
+                    Console.WriteLine("    [X] Error parsing decrypted Policy.vpol (AES keys not extracted)");
+                    return new ArrayList();
+                }
             }
             else
             {
@@ -518,30 +526,163 @@ namespace SharpDPAPI
         {
             // parse a decrypted policy blob, returning an arraylist of the AES 128/256 keys
 
-            int offset = 20;
-
-            int aes128len = BitConverter.ToInt32(decBlobBytes, offset);
-            offset += 4;
-
-            byte[] aes128Key = new byte[aes128len];
-            Array.Copy(decBlobBytes, offset, aes128Key, 0, aes128len);
-            offset += aes128len;
-            string aes128KeyStr = BitConverter.ToString(aes128Key).Replace("-", "");
-            
-            // skip more header stuff
-            offset += 20;
-
-            int aes256len = BitConverter.ToInt32(decBlobBytes, offset);
-            offset += 4;
-
-            byte[] aes256Key = new byte[aes256len];
-            Array.Copy(decBlobBytes, offset, aes256Key, 0, aes256len);
-            string aes256KeyStr = BitConverter.ToString(aes256Key).Replace("-", "");
-            
             ArrayList keys = new ArrayList();
+            string s = Encoding.ASCII.GetString(decBlobBytes, 12, 4);
 
-            keys.Add(aes128Key);
-            keys.Add(aes256Key);
+            if (s.Equals("KDBM"))
+            {
+                // https://github.com/gentilkiwi/mimikatz/blob/110a831ebe7b529c5dd3010f9e7fced0d3e3a46c/modules/kull_m_cred.h#L211-L227
+                /*
+                24 00 00 00
+	                01 00 00 00
+	                02 00 00 00
+	                4b 44 42 4d KDBM 'MBDK'
+	                01 00 00 00
+	                10 00 00 00
+		                xx xx xx (16)
+                34 00 00 00
+	                01 00 00 00
+	                01 00 00 00
+	                4b 44 42 4d KDBM 'MBDK'
+	                01 00 00 00
+	                20 00 00 00
+		                xx xx xx (32)
+                */
+
+                int offset = 20;
+
+                int aes128len = BitConverter.ToInt32(decBlobBytes, offset);
+                offset += 4;
+
+                if(aes128len != 16)
+                {
+                    Console.WriteLine("    [X] Error parsing decrypted Policy.vpol (aes128len != 16)");
+                    return keys;
+                }
+
+                byte[] aes128Key = new byte[aes128len];
+                Array.Copy(decBlobBytes, offset, aes128Key, 0, aes128len);
+                offset += aes128len;
+                string aes128KeyStr = BitConverter.ToString(aes128Key).Replace("-", "");
+
+                // skip more header stuff
+                offset += 20;
+
+                int aes256len = BitConverter.ToInt32(decBlobBytes, offset);
+                offset += 4;
+
+                if (aes256len != 32)
+                {
+                    Console.WriteLine("    [X] Error parsing decrypted Policy.vpol (aes256len != 32)");
+                    return keys;
+                }
+
+                byte[] aes256Key = new byte[aes256len];
+                Array.Copy(decBlobBytes, offset, aes256Key, 0, aes256len);
+                string aes256KeyStr = BitConverter.ToString(aes256Key).Replace("-", "");
+
+                keys.Add(aes128Key);
+                keys.Add(aes256Key);
+            }
+            else
+            {
+                int offset = 16;
+                string s2 = Encoding.ASCII.GetString(decBlobBytes, offset, 4);
+                offset += 4;
+
+                if (s2.Equals("KSSM"))
+                {
+                    // thank you @gentilkiwi :pray:
+                    // https://github.com/gentilkiwi/mimikatz/blob/110a831ebe7b529c5dd3010f9e7fced0d3e3a46c/modules/kull_m_cred.h#L238-L279
+                    /*
+                    38 02 00 00
+	                    01 00 00 00
+	                    02 00 00 00
+	                    30 02 00 00
+		                    4b 53 53 4d KSSM	'MSSK'
+		                    02 00 01 00
+		                    01 00 00 00
+		                    10 00 00 00
+		                    80 00 00 00 (128)
+		
+		                    10 00 00 00
+			                    xx xx xx (16)
+		                    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+		                    xx xx xx (16)
+		                    yy yy yy (..)
+		                    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+		                    a0 00 00 00
+		                    40 01 00 00
+		                    00 00 00 00 00 00 00 00 00 00 00 00
+		                    00 00 00 00 00 00 00 00 00 00 00 00
+                    38 02 00 00
+	                    01 00 00 00
+	                    01 00 00 00
+	                    30 02 00 00
+		                    4b 53 53 4d KSSM	'MSSK'
+		                    02 00 01 00
+		                    01 00 00 00
+		                    10 00 00 00
+		                    00 01 00 00 (256)
+		                    20 00 00 00 (32)
+			                    xx xx xx (32)
+		                    00 00 00 00
+		                    xx xx xx (32)
+		                    yy yy yy (..)
+		                    e0 00 00 00
+		                    c0 01 00 00
+		                    00 00 00 00 00 00 00 00 00 00 00 00
+		                    00 00 00 00 00 00 00 00 00 00 00 00
+                    */
+
+                    // skip
+                    offset += 16;
+
+                    int aes128len = BitConverter.ToInt32(decBlobBytes, offset);
+                    offset += 4;
+
+                    if (aes128len != 16)
+                    {
+                        Console.WriteLine("    [X] Error parsing decrypted Policy.vpol (aes128len != 16)");
+                        return keys;
+                    }
+
+                    byte[] aes128Key = new byte[aes128len];
+                    Array.Copy(decBlobBytes, offset, aes128Key, 0, aes128len);
+                    offset += aes128len;
+                    string aes128KeyStr = BitConverter.ToString(aes128Key).Replace("-", "");
+
+                    // search for the next 'MSSK' header
+                    byte[] pattern = new byte[12] { 0x4b, 0x53, 0x53, 0x4d, 0x02, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00 };
+                    int index = Helpers.ArrayIndexOf(decBlobBytes, pattern, offset);
+
+                    if (index != -1)
+                    {
+                        offset = index;
+                        offset += 20;
+
+                        int aes256len = BitConverter.ToInt32(decBlobBytes, offset);
+                        offset += 4;
+
+                        if (aes256len != 32)
+                        {
+                            Console.WriteLine("    [X] Error parsing decrypted Policy.vpol (aes256len != 32)");
+                            return keys;
+                        }
+
+                        byte[] aes256Key = new byte[aes256len];
+                        Array.Copy(decBlobBytes, offset, aes256Key, 0, aes256len);
+                        string aes256KeyStr = BitConverter.ToString(aes256Key).Replace("-", "");
+
+                        keys.Add(aes128Key);
+                        keys.Add(aes256Key);
+                    }
+                    else
+                    {
+                        Console.WriteLine("[X] Error in decrypting Policy.vpol: second MSSK header not found!");
+                    }
+                }
+            }
 
             return keys;
         }

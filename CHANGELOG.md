@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.1.1] - 2019-03-15
+
+### Added
+* **SharpDPAPI.cna** Cobalt Strike aggressor script to automate the usage of SharpDPAPI (from @leechristensen)
+
+### Changed
+* Wrapped main in try/catch
+
+### Fixed
+* Fixed Policy.vpol parsing to handle the "KSSM" (?) format. Thank you @gentilkiwi :)
+
+
 ## [1.1.0] - 2019-03-14
 
 ### Added
