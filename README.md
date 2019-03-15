@@ -15,7 +15,9 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
 
 - [SharpDPAPI](#sharpdpapi)
   * [Table of Contents](#table-of-contents)
-  * [Command Line Usage](#command-line-usage)
+  * [Background](#background)
+    + [Command Line Usage](#command-line-usage)
+    + [Operational Usage](#operational-usage)
   * [Commands](#commands)
     + [backupkey](#backupkey)
     + [masterkeys](#masterkeys)
