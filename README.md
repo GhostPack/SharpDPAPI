@@ -26,7 +26,9 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
     + [Targeting other .NET versions](#targeting-other-net-versions)
     + [Sidenote: Running SharpDPAPI Through PowerShell](#sidenote-running-sharpdpapi-through-powershell)
 
-## Command Line Usage
+## Background
+
+### Command Line Usage
 
     C:\Temp>SharpDPAPI.exe
 
@@ -66,6 +68,19 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
     Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
 
       SharpDPAPI backupkey [/server:primary.testlab.local] [/file:key.pvk]
+
+
+### Operational Usage
+
+One of the goals with SharpDPAPI is to operationalize Benjamin's DPAPI work in a way that fits with our workflow.
+
+How exactly you use the toolset will depend on what phase of an engagement you're in. In general this breaks into "have I compromised the domain or not".
+
+If domain admin (or equivalent) privileges have been obtained, the domain DPAPI backup key can be retrieved with the [backupkey](#backupkey) command (or with Mimikatz). This domain private key never changes, and can decrypt any DPAPI masterkey for domain users. This means, given a domain DPAPI backup key, an attacker can decrypt master keys for any domain user that can then be used to decrypt any Vault\Credentials\Chrome Logins\etc. The key retrieved from the [backupkey](#backupkey) command can be used with the [masterkeys](#masterkeys), [credentials](#credentials), or [vaults](#vaults) commands.
+
+If DA privileges have not been achieved, using Mimikatz' `sekurlsa::dpapi` command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys on a given system (tip: running `dpapi::cache` after key extraction will give you a nice table). If you change these keys to a `{GUID1}:SHA1 {GUID2}:SHA1...` type format, they can be supplied to the [credentials](#credentials) or [vaults](#vaults) commands. This lets you triage all Credential files\Vaults on a system for any user who's currently logged in, without having to do file by file decrypts.
+
+For more offensive DPAPI information, [check here](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/).
 
 
 ## Commands
@@ -335,4 +350,4 @@ SharpDPAPI can then be loaded in a PowerShell script with the following (where "
 
 The Main() method and any arguments can then be invoked as follows:
 
-    [SharpDPAPI.Program]::Main("dump /luid:3050142".Split())
+    [SharpDPAPI.Program]::Main("backupkey")
