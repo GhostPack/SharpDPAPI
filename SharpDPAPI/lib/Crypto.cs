@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -125,6 +126,33 @@ namespace SharpDPAPI
             return plaintextBytes;
         }
 
+        public static byte[] LSAAESDecrypt(byte[] key, byte[] data)
+        {
+            AesManaged aesCryptoProvider = new AesManaged();
+            
+            aesCryptoProvider.Key = key;
+            aesCryptoProvider.IV = new byte[16];
+            aesCryptoProvider.Mode = CipherMode.CBC;
+            aesCryptoProvider.BlockSize = 128;
+            aesCryptoProvider.Padding = PaddingMode.Zeros;
+            ICryptoTransform transform = aesCryptoProvider.CreateDecryptor();
+
+            int chunks = Decimal.ToInt32(Math.Ceiling((decimal)data.Length / (decimal)16));
+            byte[] plaintext = new byte[chunks * 16];
+
+            for (int i = 0; i < chunks; ++i)
+            {
+                int offset = i * 16;
+                byte[] chunk = new byte[16];
+                Array.Copy(data, offset, chunk, 0, 16);
+
+                byte[] chunkPlaintextBytes = transform.TransformFinalBlock(chunk, 0, chunk.Length);
+                Array.Copy(chunkPlaintextBytes, 0, plaintext, i * 16, 16);
+            }
+            
+            return plaintext;
+        }
+
         public static byte[] RSADecrypt(byte[] privateKey, byte[] dataToDecrypt)
         {
             // helper to RSA decrypt a given blob
@@ -160,6 +188,21 @@ namespace SharpDPAPI
             }
 
             return new byte[0];
+        }
+
+        public static byte[] LSASHA256Hash(byte[]key, byte[] rawData)
+        {
+            // yay
+            using (SHA256 sha256Hash = SHA256.Create())
+            {
+                byte[] buffer = new byte[key.Length + (rawData.Length * 1000)];
+                Array.Copy(key, 0, buffer, 0, key.Length);
+                for (int i = 0; i < 1000; ++i)
+                {
+                    Array.Copy(rawData, 0, buffer, key.Length + (i * rawData.Length), rawData.Length);
+                }
+                return sha256Hash.ComputeHash(buffer);
+            }
         }
     }
 }

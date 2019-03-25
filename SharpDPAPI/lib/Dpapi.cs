@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using PBKDF2;
 
 namespace SharpDPAPI
 {
@@ -96,28 +97,41 @@ namespace SharpDPAPI
                 if (algHash == 32782)
                 {
                     // grab the sha1(masterkey) from the cache
-                    byte[] keyBytes = Helpers.StringToByteArray(MasterKeys[guidString].ToString());
+                    try
+                    {
+                        byte[] keyBytes = Helpers.StringToByteArray(MasterKeys[guidString].ToString());
 
-                    // derive the session key
-                    byte[] derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash);
-                    byte[] finalKeyBytes = new byte[algCryptLen / 8];
-                    Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
+                        // derive the session key
+                        byte[] derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash);
+                        byte[] finalKeyBytes = new byte[algCryptLen / 8];
+                        Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
 
-                    // decrypt the blob with the session key
-                    return Crypto.DecryptBlob(dataBytes, finalKeyBytes, algCrypt);
+                        // decrypt the blob with the session key
+                        return Crypto.DecryptBlob(dataBytes, finalKeyBytes, algCrypt);
+                    }
+                    catch
+                    {
+                        Console.WriteLine("Error retrieving GUID:SHA1 from cache {0}", guidString);
+                    }
                 }
                 else if (algHash == 32772)
                 {
-                    // grab the sha1(masterkey) from the cache
-                    byte[] keyBytes = Helpers.StringToByteArray(MasterKeys[guidString].ToString());
+                    try {
+                        // grab the sha1(masterkey) from the cache
+                        byte[] keyBytes = Helpers.StringToByteArray(MasterKeys[guidString].ToString());
 
-                    // derive the session key
-                    byte[] derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash);
-                    byte[] finalKeyBytes = new byte[algCryptLen / 8];
-                    Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
+                        // derive the session key
+                        byte[] derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash);
+                        byte[] finalKeyBytes = new byte[algCryptLen / 8];
+                        Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
 
-                    // decrypt the blob with the session key
-                    return Crypto.DecryptBlob(dataBytes, finalKeyBytes, algCrypt);
+                        // decrypt the blob with the session key
+                        return Crypto.DecryptBlob(dataBytes, finalKeyBytes, algCrypt);
+                    }
+                    catch
+                    {
+                        Console.WriteLine("Error retrieving GUID:SHA1 from cache {0}", guidString);
+                    }
                 }
                 else
                 {
@@ -226,7 +240,7 @@ namespace SharpDPAPI
             }
         }
 
-        public static void DescribeVault(byte[] vaultBytes, ArrayList AESKeys)
+        public static void DescribeVaultCred(byte[] vaultBytes, ArrayList AESKeys)
         {
             // parses a vault credential file and displays data, attempting to decrypt if the necessary AES keys are supplied
 
@@ -254,11 +268,12 @@ namespace SharpDPAPI
             byte[] aes256key = (byte[])AESKeys[1];
 
             int offset = 0;
+            int finalAttributeOffset = 0;
 
             // skip the schema GUID
             offset += 16;
 
-            // skip unk0
+            int unk0 = BitConverter.ToInt32(vaultBytes, offset);
             offset += 4;
 
             long lastWritten = (long)BitConverter.ToInt64(vaultBytes, offset);
@@ -289,7 +304,7 @@ namespace SharpDPAPI
              */
 
             int numberOfAttributes = attributeMapLen / 12;
-
+            
             Dictionary<int, int> attributeMap = new Dictionary<int, int>();
 
             for (int i = 0; i < numberOfAttributes; ++i)
@@ -301,6 +316,9 @@ namespace SharpDPAPI
 
                 attributeMap.Add(attributeNum, attributeOffset);
             }
+
+            byte[] leftover = new byte[vaultBytes.Length - 222];
+            Array.Copy(vaultBytes, 222, leftover, 0, leftover.Length);
 
             foreach (KeyValuePair<int, int> attribute in attributeMap)
             {
@@ -333,6 +351,8 @@ namespace SharpDPAPI
                 int dataLen = BitConverter.ToInt32(vaultBytes, attributeOffset);
                 attributeOffset += 4;
 
+                finalAttributeOffset = attributeOffset;
+
                 if (dataLen > 0)
                 {
                     bool IVPresent = BitConverter.ToBoolean(vaultBytes, attributeOffset);
@@ -341,17 +361,14 @@ namespace SharpDPAPI
                     if (!IVPresent)
                     {
                         // we don't really care about these... do we?
-
-                        /*
                         byte[] dataBytes = new byte[dataLen - 1];
 
                         // use aes128, no IV
-                        Array.Copy(vaultBytes, attributeOffset, dataBytes, 0, dataLen-1);
-                        string s = BitConverter.ToString(dataBytes).Replace("-", "");
-                        
+                        Array.Copy(vaultBytes, attributeOffset, dataBytes, 0, dataLen - 1);
+
+                        finalAttributeOffset = attributeOffset + dataLen - 1;
+
                         byte[] decBytes = Crypto.AESDecrypt(aes128key, new byte[0], dataBytes);
-                        string dec = BitConverter.ToString(decBytes).Replace("-", "");
-                        */
                     }
                     else
                     {
@@ -359,22 +376,77 @@ namespace SharpDPAPI
 
                         int IVLen = BitConverter.ToInt32(vaultBytes, attributeOffset);
                         attributeOffset += 4;
-                        
+
                         byte[] IVBytes = new byte[IVLen];
                         Array.Copy(vaultBytes, attributeOffset, IVBytes, 0, IVLen);
                         attributeOffset += IVLen;
 
                         byte[] dataBytes = new byte[dataLen - 1 - 4 - IVLen];
                         Array.Copy(vaultBytes, attributeOffset, dataBytes, 0, dataLen - 1 - 4 - IVLen);
+                        attributeOffset += dataLen - 1 - 4 - IVLen;
+                        finalAttributeOffset = attributeOffset;
 
                         byte[] decBytes = Crypto.AESDecrypt(aes256key, IVBytes, dataBytes);
-                        string dec = BitConverter.ToString(decBytes).Replace("-", "");
 
                         DescribeVaultItem(decBytes);
                     }
                 }
             }
 
+            if ( (numberOfAttributes > 0) && (unk0 < 4) )
+            {
+                // bullshit vault credential clear attributes...
+
+                int clearOffset = finalAttributeOffset - 2;
+                byte[] clearBytes = new byte[vaultBytes.Length - clearOffset];
+                Array.Copy(vaultBytes, clearOffset, clearBytes, 0, clearBytes.Length);
+
+                int cleatOffSet2 = 0;
+                cleatOffSet2 += 4; // skip ID
+
+                int dataLen = BitConverter.ToInt32(clearBytes, cleatOffSet2);
+                cleatOffSet2 += 4;
+
+                if (dataLen > 2000) {
+                    Console.WriteLine("    [*] Vault credential clear attribute is > 2000 bytes, skipping...");
+                }
+
+                else if (dataLen > 0)
+                {
+                    bool IVPresent = BitConverter.ToBoolean(vaultBytes, cleatOffSet2);
+                    cleatOffSet2 += 1;
+
+                    if (!IVPresent)
+                    {
+                        // we don't really care about these... do we?
+                        byte[] dataBytes = new byte[dataLen - 1];
+
+                        // use aes128, no IV
+                        Array.Copy(clearBytes, cleatOffSet2, dataBytes, 0, dataLen - 1);
+
+                        byte[] decBytes = Crypto.AESDecrypt(aes128key, new byte[0], dataBytes);
+                    }
+                    else
+                    {
+                        // use aes256 w/ IV
+                        int IVLen = BitConverter.ToInt32(clearBytes, cleatOffSet2);
+                        cleatOffSet2 += 4;
+
+                        byte[] IVBytes = new byte[IVLen];
+                        Array.Copy(clearBytes, cleatOffSet2, IVBytes, 0, IVLen);
+                        cleatOffSet2 += IVLen;
+
+                        byte[] dataBytes = new byte[dataLen - 1 - 4 - IVLen];
+                        Array.Copy(clearBytes, cleatOffSet2, dataBytes, 0, dataLen - 1 - 4 - IVLen);
+                        cleatOffSet2 += dataLen - 1 - 4 - IVLen;
+                        finalAttributeOffset = cleatOffSet2;
+
+                        byte[] decBytes = Crypto.AESDecrypt(aes256key, IVBytes, dataBytes);
+
+                        DescribeVaultItem(decBytes);
+                    }
+                }
+            }
         }
 
         public static void DescribeVaultItem(byte[] vaultItemBytes)
@@ -710,6 +782,21 @@ namespace SharpDPAPI
             return domainKeyBytes;
         }
 
+        public static byte[] GetMasterKey(byte[] masterKeyBytes)
+        {
+            // helper to extract domain masterkey subbytes from a master key blob
+
+            int offset = 96;
+
+            long masterKeyLen = BitConverter.ToInt64(masterKeyBytes, offset);
+            offset += 4 * 8; // skip the key length headers
+            
+            byte[] masterKeySubBytes = new byte[masterKeyLen];
+            Array.Copy(masterKeyBytes, offset, masterKeySubBytes, 0, masterKeyLen);
+
+            return masterKeySubBytes;
+        }
+
         public static Dictionary<string, string> DecryptMasterKey(byte[] masterKeyBytes, byte[] backupKeyBytes)
         {
             // takes masterkey bytes and backup key bytes, returns a dictionary of guid:sha1 masterkey mappings
@@ -720,8 +807,6 @@ namespace SharpDPAPI
                 string guidMasterKey = String.Format("{{{0}}}", Encoding.Unicode.GetString(masterKeyBytes, 12, 72));
 
                 int offset = 4;
-
-                string bkb = BitConverter.ToString(backupKeyBytes).Replace("-", "");
 
                 byte[] domainKeyBytes = GetDomainKey(masterKeyBytes);
 
@@ -762,6 +847,97 @@ namespace SharpDPAPI
                 string masterKeySha1Hex = BitConverter.ToString(masterKeySha1).Replace("-", "");
 
                 mapping.Add(guidMasterKey, masterKeySha1Hex);
+            }
+            catch { }
+            return mapping;
+        }
+
+        public static Dictionary<string, string> DecryptMasterKeyWithSha(byte[] masterKeyBytes, byte[] shaBytes)
+        {
+            // takes masterkey bytes and SYSTEM_DPAPI masterkey sha bytes, returns a dictionary of guid:sha1 masterkey mappings
+
+            Dictionary<string, string> mapping = new Dictionary<string, string>();
+            try
+            {
+                string guidMasterKey = String.Format("{{{0}}}", Encoding.Unicode.GetString(masterKeyBytes, 12, 72));
+                byte[] mkBytes = GetMasterKey(masterKeyBytes);
+
+                int offset = 4;
+                byte[] salt = new byte[16];
+                Array.Copy(mkBytes, 4, salt, 0, 16);
+                offset += 16;
+
+                int rounds = BitConverter.ToInt32(mkBytes, offset);
+                offset += 4;
+
+                int algHash = BitConverter.ToInt32(mkBytes, offset);
+                offset += 4;
+
+                int algCrypt = BitConverter.ToInt32(mkBytes, offset);
+                offset += 4;
+
+                byte[] encData = new byte[mkBytes.Length - offset];
+                Array.Copy(mkBytes, offset, encData, 0, encData.Length);
+
+                byte[] final = new byte[48];
+
+                if (algHash == 32782)
+                {
+                    // derive the "Pbkdf2/SHA512" key for the masterkey, using MS' silliness
+                    using (var hmac = new HMACSHA512())
+                    {
+                        var df = new Pbkdf2(hmac, shaBytes, salt, rounds);
+                        final = df.GetBytes(48);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[X] Note: alg hash  '{0} / 0x{1}' not currently supported!", algHash, algHash.ToString("X8"));
+                }
+                
+                // CALG_AES_256 == 26128
+                if (algCrypt == 26128)
+                {
+                    AesManaged aesCryptoProvider = new AesManaged();
+
+                    byte[] ivBytes = new byte[16];
+                    Array.Copy(final, 32, ivBytes, 0, 16);
+
+                    byte[] key = new byte[32];
+                    Array.Copy(final, 0, key, 0, 32);
+
+                    aesCryptoProvider.Key = key;
+                    aesCryptoProvider.IV = ivBytes;
+                    aesCryptoProvider.Mode = CipherMode.CBC;
+                    aesCryptoProvider.Padding = PaddingMode.Zeros;
+
+                    byte[] plaintextBytes = aesCryptoProvider.CreateDecryptor().TransformFinalBlock(encData, 0, encData.Length);
+
+                    byte[] masterKeyFull = new byte[64];
+                    Array.Copy(plaintextBytes, 80, masterKeyFull, 0, masterKeyFull.Length);
+
+                    //Console.WriteLine("MasterKey (full): {0}", BitConverter.ToString(masterKeyFull).Replace("-", ""));
+                    using (SHA1Managed sha1 = new SHA1Managed())
+                    {
+                        byte[] masterKeySha1 = sha1.ComputeHash(masterKeyFull);
+                        string masterKeySha1Hex = BitConverter.ToString(masterKeySha1).Replace("-", "");
+                        //Console.WriteLine("MasterKey (sha1): {0}", BitConverter.ToString(masterKeySha1).Replace("-", ""));
+                        mapping.Add(guidMasterKey, masterKeySha1Hex);
+                    }
+                    
+                    // fuck the HMAC integrity checking for now LOL ;)
+
+                    //byte[] plaintextCryptBuffer = new byte[16];
+                    //Array.Copy(plaintextBytes, 0, plaintextBytes, 0, 16);
+
+                    //HMACSHA512 hmac = new HMACSHA512(shaBytes); // key bytes
+                    //byte[] round1bytes = hmac.ComputeHash(plaintextCryptBuffer); // salt bytes
+                    //Console.WriteLine("round1bytes: {0}", BitConverter.ToString(round1bytes).Replace("-", ""));
+                }
+                else
+                {
+                    Console.WriteLine("[X] Note: alg crypt '{0} / 0x{1}' not currently supported!", algCrypt, algCrypt.ToString("X8"));
+                }
             }
             catch { }
             return mapping;

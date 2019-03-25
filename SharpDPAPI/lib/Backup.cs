@@ -3,8 +3,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 
-
-
 namespace SharpDPAPI
 {
     public class Backup
@@ -13,6 +11,8 @@ namespace SharpDPAPI
         {
             // retrieves a DPAPI backup key from the given system (DC) specified
             //  saving the key to the specified output file
+
+            // thanks to @gentilkiwi for this approach <3
 
             Interop.LSA_UNICODE_STRING aSystemName = new Interop.LSA_UNICODE_STRING(system);
             uint aWinErrorCode = 0;
