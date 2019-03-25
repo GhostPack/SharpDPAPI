@@ -6,6 +6,8 @@ SharpDPAPI is a C# port of some DPAPI functionality from [@gentilkiwi](https://t
 
 **I did not come up with this logic, it is simply a port from Mimikatz in order to better understand the process and operationalize it to fit our workflow.**
 
+If you're unfamiliar with DPAPI, [check out this post](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/) for more background information.
+
 [@harmj0y](https://twitter.com/harmj0y) is the primary author of this port.
 
 SharpDPAPI is licensed under the BSD 3-Clause license.
@@ -316,7 +318,7 @@ Using a domain DPAPI backup key:
 
 ### machinecredentials
 
-The **machinemasterkeys** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine Credential files.
+The **machinecredentials** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine Credential files.
 
 Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
 
@@ -503,7 +505,7 @@ Using a domain DPAPI backup key with a folder specified (i.e. "offline" triage):
 
 ### machinevaults
 
-The **machinemasterkeys** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine Vaults.
+The **machinevaults** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine Vaults.
 
 Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
 
