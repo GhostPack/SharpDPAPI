@@ -855,7 +855,6 @@ namespace SharpDPAPI
         public static Dictionary<string, string> DecryptMasterKeyWithSha(byte[] masterKeyBytes, byte[] shaBytes)
         {
             // takes masterkey bytes and SYSTEM_DPAPI masterkey sha bytes, returns a dictionary of guid:sha1 masterkey mappings
-
             Dictionary<string, string> mapping = new Dictionary<string, string>();
             try
             {
@@ -881,6 +880,7 @@ namespace SharpDPAPI
 
                 byte[] final = new byte[48];
 
+                // CALG_SHA_512 == 32782
                 if (algHash == 32782)
                 {
                     // derive the "Pbkdf2/SHA512" key for the masterkey, using MS' silliness
@@ -893,11 +893,15 @@ namespace SharpDPAPI
                 else
                 {
                     Console.WriteLine("[X] Note: alg hash  '{0} / 0x{1}' not currently supported!", algHash, algHash.ToString("X8"));
+                    return mapping;
                 }
-                
-                // CALG_AES_256 == 26128
-                if (algCrypt == 26128)
+
+                // TODO: support more than just CALG_AES_256 and CALG_SHA_512 !
+
+                // CALG_AES_256 == 26128 , CALG_SHA_512 == 32782
+                if ((algCrypt == 26128) && (algHash == 32782))
                 {
+                    int HMACLen = (new HMACSHA512()).HashSize / 8;
                     AesManaged aesCryptoProvider = new AesManaged();
 
                     byte[] ivBytes = new byte[16];
@@ -911,32 +915,64 @@ namespace SharpDPAPI
                     aesCryptoProvider.Mode = CipherMode.CBC;
                     aesCryptoProvider.Padding = PaddingMode.Zeros;
 
+                    // decrypt the encrypted data using the Pbkdf2-derived key
                     byte[] plaintextBytes = aesCryptoProvider.CreateDecryptor().TransformFinalBlock(encData, 0, encData.Length);
 
-                    byte[] masterKeyFull = new byte[64];
-                    Array.Copy(plaintextBytes, 80, masterKeyFull, 0, masterKeyFull.Length);
+                    int outLen = plaintextBytes.Length;
+                    int outputLen = outLen - 16 - HMACLen;
+                    
+                    byte[] masterKeyFull = new byte[HMACLen];
 
-                    //Console.WriteLine("MasterKey (full): {0}", BitConverter.ToString(masterKeyFull).Replace("-", ""));
+                    // outLen - outputLen == 80 in this case
+                    Array.Copy(plaintextBytes, outLen - outputLen, masterKeyFull, 0, masterKeyFull.Length);
+
                     using (SHA1Managed sha1 = new SHA1Managed())
                     {
                         byte[] masterKeySha1 = sha1.ComputeHash(masterKeyFull);
                         string masterKeySha1Hex = BitConverter.ToString(masterKeySha1).Replace("-", "");
-                        //Console.WriteLine("MasterKey (sha1): {0}", BitConverter.ToString(masterKeySha1).Replace("-", ""));
-                        mapping.Add(guidMasterKey, masterKeySha1Hex);
+                        
+                        // CALG_SHA_512 == 32782
+                        if (algHash == 32782)
+                        {
+                            // we're HMAC'ing the first 16 bytes of the decrypted buffer with the shaBytes as the key
+                            byte[] plaintextCryptBuffer = new byte[16];
+                            Array.Copy(plaintextBytes, plaintextCryptBuffer, 16);
+                            HMACSHA512 hmac1 = new HMACSHA512(shaBytes);
+                            byte[] round1Hmac = hmac1.ComputeHash(plaintextCryptBuffer);
+
+                            // round 2
+                            byte[] round2buffer = new byte[outputLen];
+                            Array.Copy(plaintextBytes, outLen - outputLen, round2buffer, 0, outputLen);
+                            HMACSHA512 hmac2 = new HMACSHA512(round1Hmac);
+                            byte[] round2Hmac = hmac2.ComputeHash(round2buffer);
+
+                            // compare the second HMAC value to the original plaintextBytes, starting at index 16
+                            byte[] comparison = new byte[64];
+                            Array.Copy(plaintextBytes, 16, comparison, 0, comparison.Length);
+                            string s1 = BitConverter.ToString(comparison).Replace("-", "");
+                            string s2 = BitConverter.ToString(round2Hmac).Replace("-", "");
+
+                            if (s1.Equals(s2))
+                            {
+                                mapping.Add(guidMasterKey, masterKeySha1Hex);
+                            }
+                            else
+                            {
+                                Console.WriteLine("[X] {0}:{1} - HMAC integrity check failed!", guidMasterKey, masterKeySha1Hex);
+                                return mapping;
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("[X] Note: alg hash  '{0} / 0x{1}' not currently supported!", algHash, algHash.ToString("X8"));
+                            return mapping;
+                        }
                     }
-                    
-                    // fuck the HMAC integrity checking for now LOL ;)
-
-                    //byte[] plaintextCryptBuffer = new byte[16];
-                    //Array.Copy(plaintextBytes, 0, plaintextBytes, 0, 16);
-
-                    //HMACSHA512 hmac = new HMACSHA512(shaBytes); // key bytes
-                    //byte[] round1bytes = hmac.ComputeHash(plaintextCryptBuffer); // salt bytes
-                    //Console.WriteLine("round1bytes: {0}", BitConverter.ToString(round1bytes).Replace("-", ""));
                 }
                 else
                 {
                     Console.WriteLine("[X] Note: alg crypt '{0} / 0x{1}' not currently supported!", algCrypt, algCrypt.ToString("X8"));
+                    return mapping;
                 }
             }
             catch { }

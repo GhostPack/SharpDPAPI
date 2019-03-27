@@ -8,6 +8,8 @@ SharpDPAPI is a C# port of some DPAPI functionality from [@gentilkiwi](https://t
 
 If you're unfamiliar with DPAPI, [check out this post](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/) for more background information.
 
+For more information on Credentials and Vaults in regards to DPAPI, check out Benjamin's [wiki entry on the subject.](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials)
+
 [@harmj0y](https://twitter.com/harmj0y) is the primary author of this port.
 
 SharpDPAPI is licensed under the BSD 3-Clause license.
@@ -100,9 +102,9 @@ One of the goals with SharpDPAPI is to operationalize Benjamin's DPAPI work in a
 
 How exactly you use the toolset will depend on what phase of an engagement you're in. In general this breaks into "have I compromised the domain or not".
 
-If domain admin (or equivalent) privileges have been obtained, the domain DPAPI backup key can be retrieved with the [backupkey](#backupkey) command (or with Mimikatz). This domain private key never changes, and can decrypt any DPAPI masterkey for domain users. This means, given a domain DPAPI backup key, an attacker can decrypt master keys for any domain user that can then be used to decrypt any Vault\Credentials\Chrome Logins\etc. The key retrieved from the [backupkey](#backupkey) command can be used with the [masterkeys](#masterkeys), [credentials](#credentials), [vaults](#vaults), or [triage](#triage) commands.
+If domain admin (or equivalent) privileges have been obtained, the domain DPAPI backup key can be retrieved with the [backupkey](#backupkey) command (or with Mimikatz). This domain private key never changes, and can decrypt any DPAPI masterkeys for domain users. This means, given a domain DPAPI backup key, an attacker can decrypt masterkeys for any domain user that can then be used to decrypt any Vault/Credentials/Chrome Logins/other DPAPI blobs/etc. The key retrieved from the [backupkey](#backupkey) command can be used with the [masterkeys](#masterkeys), [credentials](#credentials), [vaults](#vaults), or [triage](#triage) commands.
 
-If DA privileges have not been achieved, using Mimikatz' `sekurlsa::dpapi` command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys (user and SYSTEM) on a given system (tip: running `dpapi::cache` after key extraction will give you a nice table). If you change these keys to a `{GUID1}:SHA1 {GUID2}:SHA1...` type format, they can be supplied to the [credentials](#credentials), [vaults](#vaults), or [triage](#triage) commands. This lets you triage all Credential files\Vaults on a system for any user who's currently logged in, without having to do file-by-file decrypts.
+If DA privileges have not been achieved, using Mimikatz' `sekurlsa::dpapi` command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys (user and SYSTEM) on a given system (tip: running `dpapi::cache` after key extraction will give you a nice table). If you change these keys to a `{GUID1}:SHA1 {GUID2}:SHA1...` type format, they can be supplied to the [credentials](#credentials), [vaults](#vaults), or [triage](#triage) commands. This lets you triage all Credential files/Vaults on a system for any user who's currently logged in, without having to do file-by-file decrypts.
 
 For machine-specific DPAPI triage, the `machinemasterkeys|machinecredentials|machinevaults|machinetriage` commands will do the machine equivalent of user DPAPI triage. If in an elevated context (that is, you need local administrative rights), SharpDPAPI will elevate to SYSTEM privileges to retrieve the "DPAPI_SYSTEM" LSA secret, which is then used to decrypt any discovered machine DPAPI masterkeys. These keys are then used as lookup tables for machine credentials/vaults/etc.
 
@@ -115,8 +117,9 @@ SharpDPAPI has an Aggressor script (**SharpDPAPI.cna**) that automates the usage
 
 Loading **SharpDPAPI.cna** will register a new **sharpDPAPI** Beacon command. If **beacon> sharpDPAPI -dump** is run, the current Beacon will execute `sekurlsa::dpapi` Mimikatz command to extract any DPAPI keys from LSASS (assuming elevation) followed by `dpapi::cache` to display the {GUID}:SHA1 mappings. The decrypted master key SHA1s are stored in the credential store.
 
-Running **beacon> sharpDPAPI** will execute SharpDPAPI with the `triage` command with any GUID:SHA1 masterkey mappings extracted for that host.This allows for effective triage of all Credentials and Vaults on a host _for any currently logged in users_.
+Running **beacon> sharpDPAPI** will execute SharpDPAPI with the `triage` command with any GUID:SHA1 masterkey mappings extracted for that host. This allows for effective triage of all Credentials and Vaults on a host _for any currently logged in users_.
 
+_TODO: implement machine key triage functions in SharpDPAPI.cna_
 
 ## Commands
 
@@ -231,13 +234,13 @@ Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA 
 
 ### credentials
 
-The **credentials** command will search for Credential files and decrypt them with either a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) or a {GUID}:SHA1 DPAPI lookup table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+The **credentials** command will search for Credential files and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, or b) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup deryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 A specific credential file (or folder of credentials) can be specified with `/target:FILE` or `/target:C:\Folder\`. If a file is specified, {GUID}:SHA1 values are required, and if a folder is specified either a) {GUID}:SHA1 values must be supplied or b) the folder must contain DPAPI masterkeys and a /pvk domain backup key must be supplied.
 
 If run from an elevated context, Credential files for ALL users will be triaged, otherwise only Credential files for the current user will be processed.
 
-Using domain DPAPI GUID mappings:
+Using domain {GUID}:SHA1 masterkey mappings:
 
     C:\Temp>SharpDPAPI.exe credentials {44ca9f3a-9097-455e-94d0-d91de951c097}:9b049ce6918ab89937687...(snip)... {feef7b25-51d6-4e14-a52f-eb2a387cd0f3}:f9bc09dad3bc2cd00efd903...(snip)...
 
@@ -273,8 +276,8 @@ Using domain DPAPI GUID mappings:
       ...(snip)...
 
 
-Using a domain DPAPI backup key:
-
+Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
+ 
     C:\Temp>SharpDPAPI.exe credentials /pvk:HvG1sAAAAAABAAAAAAAAAAAAAAC...(snip)...
 
       __                 _   _       _ ___
@@ -376,13 +379,13 @@ Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA 
 
 ### vaults
 
-The **vaults** command will search for Vault files and decrypt them with either a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) or a {GUID}:SHA1 DPAPI lookup table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+The **vaults** command will search for Vaults and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, or b) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup deryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 The Policy.vpol folder in the Vault folder is decrypted with any supplied DPAPI keys to retrieve the associated AES decryption keys, which are then used to decrypt any associated .vcrd files.
 
 A specific vault folder can be specified with `/target:C:\Folder\`. In this case, either a) {GUID}:SHA1 values must be supplied or b) the folder must contain DPAPI masterkeys and a /pvk domain backup key must be supplied.
 
-Using domain DPAPI GUID mappings:
+Using domain {GUID}:SHA1 masterkey mappings:
 
     C:\Temp>SharpDPAPI.exe vaults {44ca9f3a-9097-455e-94d0-d91de951c097}:9b049ce6918ab89937687...(snip)... {feef7b25-51d6-4e14-a52f-eb2a387cd0f3}:f9bc09dad3bc2cd00efd903...(snip)...
       __                 _   _       _ ___
@@ -418,7 +421,7 @@ Using domain DPAPI GUID mappings:
     ...(snip)...
 
 
-Using a domain DPAPI backup key:
+Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
 
     C:\Temp>SharpDPAPI.exe credentials /pvk:HvG1sAAAAAABAAAAAAAAAAAAAAC...(snip)...
       __                 _   _       _ ___
