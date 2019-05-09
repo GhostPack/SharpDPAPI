@@ -10,7 +10,7 @@ namespace SharpDPAPI.Domain
             Console.WriteLine(" (_  |_   _. ._ ._  | \\ |_) /\\  |_) |  ");
             Console.WriteLine(" __) | | (_| |  |_) |_/ |  /--\\ |  _|_ ");
             Console.WriteLine("                |                      ");
-            Console.WriteLine("  v1.2.0                               \r\n");
+            Console.WriteLine("  v1.3.0                               \r\n");
         }
 
         public static void ShowUsage()
@@ -31,12 +31,12 @@ Triage all reachable user masterkey files, use a domain backup key to decrypt al
   SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>
 
 
-Triage all reachable user Credential files, Vaults, or both using a domain DPAPI backup key to decrypt masterkeys:
+Triage all reachable user Credential files, Vaults, or both using a domain DPAPI backup key to decrypt masterkeys first:
 
   SharpDPAPI <credentials|vaults|triage> </pvk:BASE64... | /pvk:key.pvk>
 
 
-Triage all reachable user Credential files, Vaults, or both on a *remote* system using a domain DPAPI backup key to decrypt masterkeys:
+Triage all reachable user Credential files, Vaults, or both on a *remote* system using a domain DPAPI backup key to decrypt masterkeys first:
 
   SharpDPAPI <credentials|vaults|triage> </pvk:BASE64... | /pvk:key.pvk> /server:SERVER.domain.com
 
@@ -57,9 +57,30 @@ Triage a specific Vault folder, using GUID lookups or a domain backup key for de
   SharpDPAPI vaults /target:C:\FOLDER\ [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
 
 
+Search for RDCMan.settings (and linked .RDG files), using CryptUnprotectData() to decrypt saved RDG passwords:
+
+  SharpDPAPI rdg /unprotect
+
+
+Search for RDCMan.settings (and linked .RDG files), using GUID lookups or a domain backup key for decryption:
+
+  SharpDPAPI rdg  [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
+
+
+Triage a specific .RDG/RDCMan.setting file or folder, using GUID lookups or a domain backup key for decryption:
+
+  SharpDPAPI rdg /target:C:\FOLDER\ [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
+  SharpDPAPI rdg /target:C:\FOLDER\FILE.rdg  [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
+
+
 Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
 
   SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
+
+
+Describe a DPAPI binary blob, optionally using GUID lookups or a domain backup key for decryption:
+
+  SharpDPAPI blob /in:C:\FOLDER\blob.bin [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
 ";
             Console.WriteLine(usage);
         }

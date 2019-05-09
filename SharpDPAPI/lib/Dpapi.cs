@@ -10,7 +10,7 @@ namespace SharpDPAPI
 {
     public class Dpapi
     {
-        public static byte[] DescribeDPAPIBlob(byte[] blobBytes, Dictionary<string, string> MasterKeys, string blobType = "credential")
+        public static byte[] DescribeDPAPIBlob(byte[] blobBytes, Dictionary<string, string> MasterKeys, string blobType = "credential", bool unprotect = false)
         {
             // parses a DPAPI credential or vault policy blob, also returning the decrypted blob plaintext
 
@@ -27,6 +27,14 @@ namespace SharpDPAPI
             {
                 offset = 24;
             }
+            else if (blobType.Equals("blob"))
+            {
+                offset = 24;
+            }
+            else if (blobType.Equals("rdg"))
+            {
+                offset = 24;
+            }
             else
             {
                 Console.WriteLine("[X] Unsupported blob type: {0}", blobType);
@@ -37,19 +45,28 @@ namespace SharpDPAPI
             Array.Copy(blobBytes, offset, guidMasterKeyBytes, 0, 16);
             Guid guidMasterKey = new Guid(guidMasterKeyBytes);
             string guidString = String.Format("{{{0}}}", guidMasterKey);
-            Console.WriteLine("    guidMasterKey    : {0}", guidString);
+            if (!blobType.Equals("rdg"))
+            {
+                Console.WriteLine("    guidMasterKey    : {0}", guidString);
+            }
             offset += 16;
 
-            Console.WriteLine("    size             : {0}", blobBytes.Length);
+            if (!blobType.Equals("rdg"))
+            {
+                Console.WriteLine("    size             : {0}", blobBytes.Length);
+            }
 
             UInt32 flags = BitConverter.ToUInt32(blobBytes, offset);
             offset += 4;
-            Console.Write("    flags            : 0x{0}", flags.ToString("X"));
-            if ((flags & 0x20000000) == flags)
+            if (!blobType.Equals("rdg"))
             {
-                Console.Write(" (CRYPTPROTECT_SYSTEM)");
+                Console.Write("    flags            : 0x{0}", flags.ToString("X"));
+                if ((flags != 0) && ((flags & 0x20000000) == flags))
+                {
+                    Console.Write(" (CRYPTPROTECT_SYSTEM)");
+                }
+                Console.WriteLine();
             }
-            Console.WriteLine();
 
             int descLength = BitConverter.ToInt32(blobBytes, offset);
             offset += 4;
@@ -75,9 +92,11 @@ namespace SharpDPAPI
             int algHash = BitConverter.ToInt32(blobBytes, offset);
             offset += 4;
 
-            Console.WriteLine("    algHash/algCrypt : {0}/{1}", algHash, algCrypt);
-
-            Console.WriteLine("    description      : {0}", description);
+            if (!blobType.Equals("rdg"))
+            {
+                Console.WriteLine("    algHash/algCrypt : {0} ({1}) / {2} ({3})", algHash, (Interop.CryptAlg)algHash, algCrypt, (Interop.CryptAlg)algCrypt);
+                Console.WriteLine("    description      : {0}", description);
+            }
 
             int algHashLen = BitConverter.ToInt32(blobBytes, offset);
             offset += 4;
@@ -90,10 +109,24 @@ namespace SharpDPAPI
             byte[] dataBytes = new byte[dataLen];
             Array.Copy(blobBytes, offset, dataBytes, 0, dataLen);
 
-            if (MasterKeys.ContainsKey(guidString))
+            if ( (blobType.Equals("rdg") || blobType.Equals("blob")) && unprotect )
+            {
+                // use CryptUnprotectData()
+                byte[] entropy = new byte[0];
+                try
+                {
+                    byte[] decBytes = ProtectedData.Unprotect(blobBytes, entropy, DataProtectionScope.CurrentUser);
+                    return decBytes;
+                }
+                catch
+                {
+                    return Encoding.Unicode.GetBytes(String.Format("MasterKey needed - {0}", guidString));
+                }
+            }
+
+            else if (MasterKeys.ContainsKey(guidString))
             {
                 // if this key is present, decrypt this blob
-
                 if (algHash == 32782)
                 {
                     // grab the sha1(masterkey) from the cache
@@ -111,7 +144,7 @@ namespace SharpDPAPI
                     }
                     catch
                     {
-                        Console.WriteLine("Error retrieving GUID:SHA1 from cache {0}", guidString);
+                        Console.WriteLine("    [X] Error retrieving GUID:SHA1 from cache {0}", guidString);
                     }
                 }
                 else if (algHash == 32772)
@@ -130,19 +163,30 @@ namespace SharpDPAPI
                     }
                     catch
                     {
-                        Console.WriteLine("Error retrieving GUID:SHA1 from cache {0}", guidString);
+                        Console.WriteLine("    [X] Error retrieving GUID:SHA1 from cache {0}", guidString);
                     }
                 }
                 else
                 {
-                    Console.WriteLine("    [X] Only sha1 and sha256 are currently supported for the hash algorithm. Alg '{0}' not supported", algHash);
+                    Console.WriteLine("    [X] Only sha1 and sha256 are currently supported for the hash algorithm. Alg '{0}' ({1}) not supported", algHash, (Interop.CryptAlg)algHash);
                 }
             }
             else
             {
-                Console.WriteLine("    [X] MasterKey GUID not in cache: {0}", guidString);
+                if (blobType.Equals("rdg"))
+                {
+                    return Encoding.Unicode.GetBytes(String.Format("MasterKey needed - {0}", guidString));
+                }
+                else
+                {
+                    Console.WriteLine("    [X] MasterKey GUID not in cache: {0}", guidString);
+                }
             }
-            Console.WriteLine();
+
+            if (!blobType.Equals("rdg"))
+            {
+                Console.WriteLine();
+            }
 
             return new byte[0];
         }
@@ -490,7 +534,6 @@ namespace SharpDPAPI
                 offset += 4;
 
                 string entryString = Encoding.Unicode.GetString(vaultItemBytes, offset, size);
-
                 byte[] entryData = new byte[size];
                 Array.Copy(vaultItemBytes, offset, entryData, 0, size);
 
@@ -508,8 +551,15 @@ namespace SharpDPAPI
                         Console.WriteLine("    Authenticator    : {0}", entryString);
                         break;
                     default:
-                        string entryDataString = BitConverter.ToString(entryData).Replace("-", " ");
-                        //Console.WriteLine("    Property         : {0}", entryDataString);
+                        if (Helpers.IsUnicode(entryData))
+                        {
+                            Console.WriteLine("    Property {0}     : {1}", id, entryString);
+                        }
+                        else
+                        {
+                            string entryDataString = BitConverter.ToString(entryData).Replace("-", " ");
+                            Console.WriteLine("    Property {0}     : {1}", id, entryDataString);
+                        }
                         break;
                 }
             }
@@ -589,9 +639,20 @@ namespace SharpDPAPI
 
             Int32 credBlobLen = BitConverter.ToInt32(decBlobBytes, offset);
             offset += 4;
-            string credBlob = Encoding.Unicode.GetString(decBlobBytes, offset, credBlobLen);
+            byte[] credBlobBytes = new byte[credBlobLen];
+            Array.Copy(decBlobBytes, offset, credBlobBytes, 0, credBlobLen);
             offset += credBlobLen;
-            Console.WriteLine("    Credential       : {0}", credBlob);
+
+            if (Helpers.IsUnicode(credBlobBytes))
+            {
+                string credBlob = Encoding.Unicode.GetString(credBlobBytes);
+                Console.WriteLine("    Credential       : {0}", credBlob);
+            }
+            else
+            {
+                string credBlobByteString = BitConverter.ToString(credBlobBytes).Replace("-", " ");
+                Console.WriteLine("    Credential       : {0}", credBlobByteString);
+            }
         }
 
         public static ArrayList ParseDecPolicyBlob(byte[] decBlobBytes)

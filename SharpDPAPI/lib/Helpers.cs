@@ -45,6 +45,13 @@ namespace SharpDPAPI
             return ret;
         }
 
+        public static bool IsUnicode(byte[] bytes)
+        {
+            // helper that users the IsTextUnicode() API call to determine if a byte array is likely unicode text
+            Interop.IsTextUnicodeFlags flags = Interop.IsTextUnicodeFlags.IS_TEXT_UNICODE_STATISTICS;
+            return Interop.IsTextUnicode(bytes, bytes.Length, ref flags);
+        }
+
         public static string RemoveWhiteSpaces(string input)
         {
             return Regex.Replace(input, @"\ +(?=(\n|\r?$))", "");

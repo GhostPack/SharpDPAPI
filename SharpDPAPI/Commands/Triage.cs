@@ -54,6 +54,9 @@ namespace SharpDPAPI.Commands
 
                 Triage.TriageUserCreds(mappings, server);
                 Triage.TriageUserVaults(mappings);
+                Console.WriteLine();
+                Triage.TriageRDCMan(mappings, "", false);
+
                 return;
             }
             else
@@ -67,6 +70,16 @@ namespace SharpDPAPI.Commands
                 {
                     Triage.TriageUserCreds(arguments);
                     Triage.TriageUserVaults(arguments);
+                    Console.WriteLine();
+                    if(arguments.Count == 0)
+                    {
+                        // try to use CryptUnprotectData if no GUID lookups supplied
+                        Triage.TriageRDCMan(arguments, "", true);
+                    }
+                    else
+                    {
+                        Triage.TriageRDCMan(arguments, "", false);
+                    }
                 }
             }
         }

