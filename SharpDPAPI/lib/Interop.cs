@@ -313,6 +313,7 @@ namespace SharpDPAPI
         [DllImport("advapi32.dll", SetLastError = true)]
         public static extern bool RevertToSelf();
 
+
         // for unicode detection
         [Flags]
         public enum IsTextUnicodeFlags : int
@@ -388,6 +389,11 @@ namespace SharpDPAPI
         public static extern int RegCloseKey(
             IntPtr hKey
         );
+
+
+        [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+        [return: MarshalAsAttribute(UnmanagedType.Bool)]
+        internal static extern bool PathIsUNC([MarshalAsAttribute(UnmanagedType.LPWStr), In] string pszPath);
 
 
         // for DC enumeration

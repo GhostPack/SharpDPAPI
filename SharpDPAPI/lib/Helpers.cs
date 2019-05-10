@@ -27,6 +27,22 @@ namespace SharpDPAPI
             }
         }
 
+        public static string ConvertLocalPathToUNCPath(string computerName, string localPath)
+        {
+            // takes a computername and local path, and returns a translated \\UNC path for that file
+            try
+            {
+                string[] parts = localPath.Split(new char[] { System.IO.Path.DirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+                string driveLetter = parts[0].Replace(':', '$');
+                string newPath = String.Format("\\\\{0}\\{1}\\{2}", computerName, driveLetter, String.Join("\\", (parts.Skip(1).Take(parts.Length - 1)).ToArray()));
+                return newPath;
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
         public static byte[] Combine(byte[] first, byte[] second)
         {
             // helper to combine two byte arrays

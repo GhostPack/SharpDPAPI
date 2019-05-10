@@ -28,12 +28,14 @@ namespace SharpDPAPI.Commands
 
                 if (arguments.ContainsKey("/server"))
                 {
+                    // triage a remote server for masterkeys using the /pvk dpapi backup key
                     server = arguments["/server"];
                     Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
                     mappings = Triage.TriageUserMasterKeys(backupKeyBytes, false, server);
                 }
                 else
                 {
+                    // triage a local server for masterkeys using the /pvk dpapi backup key
                     Console.WriteLine("");
                     mappings = Triage.TriageUserMasterKeys(backupKeyBytes, false);
                 }
@@ -53,9 +55,9 @@ namespace SharpDPAPI.Commands
                 }
 
                 Triage.TriageUserCreds(mappings, server);
-                Triage.TriageUserVaults(mappings);
+                Triage.TriageUserVaults(mappings, server);
                 Console.WriteLine();
-                Triage.TriageRDCMan(mappings, "", false);
+                Triage.TriageRDCMan(mappings, server, false);
 
                 return;
             }

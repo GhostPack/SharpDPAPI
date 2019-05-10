@@ -630,9 +630,32 @@ namespace SharpDPAPI
                 // triage recently used RDG files                
                 foreach (XmlNode rdgFile in items)
                 {
-                    TriageRDGFile(MasterKeys, rdgFile.InnerText, unprotect);
+                    if (Interop.PathIsUNC(rdcManFile))
+                    {
+                        // If the RDCMan.settings file is a \\UNC path (so /server:X was used),
+                        //  check if the .RDG file is local or also a \\UNC path.
+                        if (!Interop.PathIsUNC(rdgFile.InnerText))
+                        {
+                            // If the file .RDG file is local, try to translate it to the server \\UNC path
+                            string computerName = rdcManFile.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries)[0];
+                            string rdgUncPath = Helpers.ConvertLocalPathToUNCPath(computerName, rdgFile.InnerText);
+                            TriageRDGFile(MasterKeys, rdgUncPath, unprotect);
+                        }
+                        else
+                        {
+                            TriageRDGFile(MasterKeys, rdgFile.InnerText, unprotect);
+                        }
+                    }
+                    else
+                    {
+                        TriageRDGFile(MasterKeys, rdgFile.InnerText, unprotect);
+                    }
                 }
                 Console.WriteLine();
+            }
+            else
+            {
+                // Console.WriteLine("\r\n      [X] RDCMan.settings file '{0}' is not accessible or doesn't exist!", rdcManFile);
             }
         }
 
@@ -747,6 +770,10 @@ namespace SharpDPAPI
                         Console.WriteLine("Exception: {0}", e);
                     }
                 }
+            }
+            else
+            {
+                Console.WriteLine("\r\n      [X] .RDG file '{0}' is not accessible or doesn't exist!", rdgFilePath);
             }
         }
 

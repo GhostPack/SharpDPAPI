@@ -10,7 +10,7 @@ namespace SharpDPAPI.Domain
             Console.WriteLine(" (_  |_   _. ._ ._  | \\ |_) /\\  |_) |  ");
             Console.WriteLine(" __) | | (_| |  |_) |_/ |  /--\\ |  _|_ ");
             Console.WriteLine("                |                      ");
-            Console.WriteLine("  v1.3.0                               \r\n");
+            Console.WriteLine("  v1.3.1                               \r\n");
         }
 
         public static void ShowUsage()

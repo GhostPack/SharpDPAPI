@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.3.1] - 2019-05-09
+
+### Changed
+* When using /server:X, .RDG files parsed from RDCMan.settings files are translated to \\\\UNC paths for parsing
+
+### Fixed
+* **triage** command when used against a remote /server:X now works properly
+
+
 ## [1.3.0] - 2019-05-09
 
 ### Added
