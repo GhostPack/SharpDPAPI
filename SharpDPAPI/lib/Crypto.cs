@@ -9,7 +9,7 @@ namespace SharpDPAPI
 {
     public class Crypto
     {
-        public static byte[] DecryptBlob(byte[] ciphertext, byte[] key, int algCrypt = 26115)
+        public static byte[] DecryptBlob(byte[] ciphertext, byte[] key, int algCrypt = 26115, PaddingMode padding = PaddingMode.Zeros)
         {
             // decrypts a DPAPI blob using 3DES or AES
 
@@ -27,7 +27,7 @@ namespace SharpDPAPI
                 desCryptoProvider.Key = key;
                 desCryptoProvider.IV = ivBytes;
                 desCryptoProvider.Mode = CipherMode.CBC;
-                desCryptoProvider.Padding = PaddingMode.Zeros;
+                desCryptoProvider.Padding = padding;
 
                 byte[] plaintextBytes = desCryptoProvider.CreateDecryptor().TransformFinalBlock(ciphertext, 0, ciphertext.Length);
 
@@ -43,7 +43,7 @@ namespace SharpDPAPI
                 aesCryptoProvider.Key = key;
                 aesCryptoProvider.IV = ivBytes;
                 aesCryptoProvider.Mode = CipherMode.CBC;
-                aesCryptoProvider.Padding = PaddingMode.Zeros;
+                aesCryptoProvider.Padding = padding;
 
                 byte[] plaintextBytes = aesCryptoProvider.CreateDecryptor().TransformFinalBlock(ciphertext, 0, ciphertext.Length);
 

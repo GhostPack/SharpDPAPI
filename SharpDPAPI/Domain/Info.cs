@@ -10,77 +10,46 @@ namespace SharpDPAPI.Domain
             Console.WriteLine(" (_  |_   _. ._ ._  | \\ |_) /\\  |_) |  ");
             Console.WriteLine(" __) | | (_| |  |_) |_/ |  /--\\ |  _|_ ");
             Console.WriteLine("                |                      ");
-            Console.WriteLine("  v1.3.1                               \r\n");
+            Console.WriteLine("  v{0}                               \r\n", SharpDPAPI.Version.version);
         }
 
         public static void ShowUsage()
         {
             string usage = @"
-Triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret):
-
-  SharpDPAPI machinemasterkeys
-
-
-Triage all reachable machine Credential files, Vaults, or both (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret):
-
-  SharpDPAPI <machinecredentials|machinevaults|machinetriage>
-
-
-Triage all reachable user masterkey files, use a domain backup key to decrypt all that are found:
-
-  SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>
-
-
-Triage all reachable user Credential files, Vaults, or both using a domain DPAPI backup key to decrypt masterkeys first:
-
-  SharpDPAPI <credentials|vaults|triage> </pvk:BASE64... | /pvk:key.pvk>
-
-
-Triage all reachable user Credential files, Vaults, or both on a *remote* system using a domain DPAPI backup key to decrypt masterkeys first:
-
-  SharpDPAPI <credentials|vaults|triage> </pvk:BASE64... | /pvk:key.pvk> /server:SERVER.domain.com
-
-
-Triage all reachable user Credential files or Vaults, or both optionally using the GUID masterkey mapping to decrypt any matches:
-
-  SharpDPAPI <credentials|vaults|triage> [GUID1:SHA1 GUID2:SHA1 ...]
-
-
-Triage a specific Credential file or folder, using GUID lookups or a domain backup key for decryption:
-
-  SharpDPAPI credentials /target:C:\FOLDER\ [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
-  SharpDPAPI credentials /target:C:\FOLDER\FILE [GUID1:SHA1 GUID2:SHA1]
-
-
-Triage a specific Vault folder, using GUID lookups or a domain backup key for decryption:
-
-  SharpDPAPI vaults /target:C:\FOLDER\ [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
-
-
-Search for RDCMan.settings (and linked .RDG files), using CryptUnprotectData() to decrypt saved RDG passwords:
-
-  SharpDPAPI rdg /unprotect
-
-
-Search for RDCMan.settings (and linked .RDG files), using GUID lookups or a domain backup key for decryption:
-
-  SharpDPAPI rdg  [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
-
-
-Triage a specific .RDG/RDCMan.setting file or folder, using GUID lookups or a domain backup key for decryption:
-
-  SharpDPAPI rdg /target:C:\FOLDER\ [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
-  SharpDPAPI rdg /target:C:\FOLDER\FILE.rdg  [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
-
 
 Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
 
   SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
 
 
-Describe a DPAPI binary blob, optionally using GUID lookups or a domain backup key for decryption:
+Machine Triage:
 
-  SharpDPAPI blob /in:C:\FOLDER\blob.bin [GUID1:SHA1 GUID2:SHA1 ... | /pvk:BASE64... | /pvk:key.pvk]
+    machinemasterkeys       -   triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret)
+    machinecredentials      -   use 'machinemasterkeys' and then triage machine Credential files
+    machinevaults           -   use 'machinemasterkeys' and then triage machine Vaults
+    machinetriage           -   run the 'machinecredentials' and 'machinevaults' commands
+
+
+User Triage:
+
+    Triage all reachable user masterkey files, use a domain backup key to decrypt all that are found:
+
+      SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>    
+
+
+    Global arguments for the credentials|vaults|rdg|triage|blob commands:
+
+        Decryption:
+            /unprotect      -   force use of CryptUnprotectData() (default for unprivileged execution)
+            GUID1:SHA1 ...  -   use a one or more GUID:SHA1 masterkeys for decryption
+            /mkfile:FILE    -   use a file of one or more GUID:SHA1 masterkeys for decryption
+            /pvk:BASE64...  -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
+            /pvk:key.pvk    -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+
+        Targeting:
+            /target:FILE    -   triage a specific 'Credentials','.rdg|RDCMan.settings' file location, or 'Vault' folder
+            /server:SERVER  -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
+
 ";
             Console.WriteLine(usage);
         }

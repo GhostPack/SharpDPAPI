@@ -13,151 +13,67 @@ namespace SharpDPAPI.Commands
             Console.WriteLine("\r\n[*] Action: RDG Triage\r\n");
             arguments.Remove("rdg");
 
-            // whether to use CryptUnprotectData() instead of masterkeys
-            bool unprotect = false;
+            string server = "";             // used for remote server specification
+            bool unprotect = false;         // whether to force CryptUnprotectData()
 
             if (arguments.ContainsKey("/unprotect"))
             {
                 unprotect = true;
-                arguments.Remove("/unprotect");
+            }
 
-                Console.WriteLine("[*] Using CryptUnprotectData() to decrypt RDG passwords\r\n");
+            if (arguments.ContainsKey("/server"))
+            {
+                server = arguments["/server"];
+                Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
+            }
 
-                if (arguments.ContainsKey("/server")) {
-                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' !");
-                    return;
+            // {GUID}:SHA1 keys are the only ones that don't start with /
+            Dictionary<string, string> masterkeys = new Dictionary<string, string>();
+            foreach (KeyValuePair<string, string> entry in arguments)
+            {
+                if (!entry.Key.StartsWith("/"))
+                {
+                    masterkeys.Add(entry.Key, entry.Value);
                 }
+            }
+            if (arguments.ContainsKey("/pvk"))
+            {
+                // use a domain DPAPI backup key to triage masterkeys
+                masterkeys = SharpDPAPI.Dpapi.PVKTriage(arguments);
+            }
+            else if (arguments.ContainsKey("/mkfile"))
+            {
+                masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);
             }
 
             if (arguments.ContainsKey("/target"))
             {
-                string target = arguments["/target"];
-                arguments.Remove("/target");
+                string target = arguments["/target"].Trim('"').Trim('\'');
 
-                if (arguments.ContainsKey("/pvk"))
+                if (target.EndsWith(".rdg"))
                 {
-                    // using a domain backup key to decrypt everything
-                    string pvk64 = arguments["/pvk"];
-                    byte[] backupKeyBytes;
-
-                    if (File.Exists(pvk64))
-                    {
-                        backupKeyBytes = File.ReadAllBytes(pvk64);
-                    }
-                    else
-                    {
-                        backupKeyBytes = Convert.FromBase64String(pvk64);
-                    }
-
-                    // build a {GUID}:SHA1 masterkey mappings
-                    Dictionary<string, string> mappings = Triage.TriageUserMasterKeys(backupKeyBytes, false);
-
-                    if (mappings.Count == 0)
-                    {
-                        Console.WriteLine("\r\n[!] No master keys decrypted!\r\n");
-                    }
-                    else
-                    {
-                        Console.WriteLine("\r\n[*] User master key cache:\r\n");
-                        foreach (KeyValuePair<string, string> kvp in mappings)
-                        {
-                            Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
-                        }
-                    }
-
-                    Console.WriteLine("\r\n[*] Using a domain DPAPI backup key to triage masterkeys for decryption key mappings!\r\n");
-                    arguments = mappings;
+                    Console.WriteLine("[*] Target .RDG File: {0}\r\n", target);
+                    Triage.TriageRDGFile(masterkeys, target, unprotect);
                 }
-
-                if (File.Exists(target))
+                else if (target.EndsWith(".settings"))
                 {
-                    if (target.EndsWith(".rdg"))
-                    {
-                        Console.WriteLine("[*] Target .RDG File: {0}\r\n", target);
-                        Triage.TriageRDGFile(arguments, target, unprotect);
-                    }
-                    else if (target.EndsWith(".settings"))
-                    {
-                        Console.WriteLine("[*] Target RDCMan.settings File: {0}\r\n", target);
-                        Triage.TriageRDCManFile(arguments, target, unprotect);
-                    }
-                    else
-                    {
-                        Console.WriteLine("[X] Target must be .RDG or RDCMan.settings file: {0}\r\n", target);
-                    }
-                }
-                else if (Directory.Exists(target))
-                {
-                    Console.WriteLine("[*] Target RDG Folder: {0}\r\n", target);
-                    Triage.TriageRDGFolder(arguments, target, unprotect);
+                    Console.WriteLine("[*] Target RDCMan.settings File: {0}\r\n", target);
+                    Triage.TriageRDCManFile(masterkeys, target, unprotect);
                 }
                 else
                 {
-                    Console.WriteLine("\r\n[X] '{0}' is not a valid file or directory.", target);
+                    Console.WriteLine("[X] Target must be .RDG or RDCMan.settings file: {0}\r\n", target);
                 }
-            }
-
-            else if (arguments.ContainsKey("/pvk"))
-            {
-                // using a domain backup key to decrypt everything
-
-                string pvk64 = arguments["/pvk"];
-                string server = "";
-
-                byte[] backupKeyBytes;
-
-                if (File.Exists(pvk64))
-                {
-                    backupKeyBytes = File.ReadAllBytes(pvk64);
-                }
-                else
-                {
-                    backupKeyBytes = Convert.FromBase64String(pvk64);
-                }
-
-                Console.WriteLine("[*] Using a domain DPAPI backup key to triage masterkeys for decryption key mappings!");
-
-                // build a {GUID}:SHA1 masterkey mappings
-                Dictionary<string, string> mappings = new Dictionary<string, string>();
-
-                if (arguments.ContainsKey("/server"))
-                {
-                    server = arguments["/server"];
-                    Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
-                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, false, server);
-                }
-                else
-                {
-                    Console.WriteLine("");
-                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, false);
-                }
-
-                if (mappings.Count == 0)
-                {
-                    Console.WriteLine("[!] No master keys decrypted!\r\n");
-                }
-                else
-                {
-                    Console.WriteLine("[*] User master key cache:\r\n");
-                    foreach (KeyValuePair<string, string> kvp in mappings)
-                    {
-                        Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
-                    }
-                    Console.WriteLine();
-                }
-
-                Triage.TriageRDCMan(mappings, server, unprotect);
             }
             else
             {
-                if (arguments.ContainsKey("/server"))
+                if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk"))
                 {
-                    //Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' !");
-                    Console.WriteLine("[X] /server:X option not currently supported for this function!");
+                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' !");
                 }
                 else
                 {
-                    Triage.TriageRDCMan(arguments, "", unprotect);
+                    Triage.TriageRDCMan(masterkeys, server, unprotect);
                 }
             }
         }

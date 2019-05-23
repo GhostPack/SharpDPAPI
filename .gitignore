@@ -5,4 +5,4 @@
 [Bb]in/
 [Oo]bj/
 .DS_Store
-SharpDPAPI.csproj.user
+*.csproj.user

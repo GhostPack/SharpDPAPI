@@ -5,6 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.4.0] - 2019-05-22
+
+### Added
+* **SharpChrome** project
+    * Separate project that implements a SQLite parsing database for Chrome triage. Uses shared files with SharpDPAPI. Adapted from the SharpWeb/SharpChrome project by @djhohnstein.
+    * **logins** function
+        * Finds/decrypts Chrome 'Login Data' files. See README.md for complete syntax/flags.
+    * **cookies** function
+        * Finds/decrypts Chrome 'Cookies' files. See README.md for complete syntax/flags.
+* Added **/mkfile:FILE** argument to credentials/vaults/rdg/triage commands, takes a SharpDPAPI or Mimikatz formatted file of {GUID}:SHA1 masterkey mappings (for offline triage)
+
+### Changed
+* Cleaned up and simplified the credentials/vaults/rdg/triage command functions in SharpDPAPI
+* Cleaned up and reorganized SharpDPAPI's default help menu output
+
+
 ## [1.3.1] - 2019-05-09
 
 ### Changed

@@ -13,75 +13,50 @@ namespace SharpDPAPI.Commands
             Console.WriteLine("\r\n[*] Action: User DPAPI Credential and Vault Triage\r\n");
             arguments.Remove("triage");
 
-            string server = "";
+            string server = "";             // used for remote server specification
 
+            if (arguments.ContainsKey("/server"))
+            {
+                server = arguments["/server"];
+                Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
+            }
+
+            // {GUID}:SHA1 keys are the only ones that don't start with /
+            Dictionary<string, string> masterkeys = new Dictionary<string, string>();
+            foreach (KeyValuePair<string, string> entry in arguments)
+            {
+                if (!entry.Key.StartsWith("/"))
+                {
+                    masterkeys.Add(entry.Key, entry.Value);
+                }
+            }
             if (arguments.ContainsKey("/pvk"))
             {
-                // using a domain backup key to decrypt everything
-                string pvk64 = arguments["/pvk"];
-                byte[] backupKeyBytes = Convert.FromBase64String(pvk64);
+                // use a domain DPAPI backup key to triage masterkeys
+                masterkeys = SharpDPAPI.Dpapi.PVKTriage(arguments);
+            }
+            else if (arguments.ContainsKey("/mkfile"))
+            {
+                masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);
+            }
 
-                Console.WriteLine("[*] Using a domain DPAPI backup key to triage masterkeys for decryption key mappings!");
-
-                // build a {GUID}:SHA1 masterkey mappings
-                Dictionary<string, string> mappings = new Dictionary<string, string>();
-
-                if (arguments.ContainsKey("/server"))
-                {
-                    // triage a remote server for masterkeys using the /pvk dpapi backup key
-                    server = arguments["/server"];
-                    Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
-                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, false, server);
-                }
-                else
-                {
-                    // triage a local server for masterkeys using the /pvk dpapi backup key
-                    Console.WriteLine("");
-                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, false);
-                }
-
-                if (mappings.Count == 0)
-                {
-                    Console.WriteLine("[!] No master keys decrypted!\r\n");
-                }
-                else
-                {
-                    Console.WriteLine("[*] Master key cache:\r\n");
-                    foreach (KeyValuePair<string, string> kvp in mappings)
-                    {
-                        Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
-                    }
-                    Console.WriteLine();
-                }
-
-                Triage.TriageUserCreds(mappings, server);
-                Triage.TriageUserVaults(mappings, server);
-                Console.WriteLine();
-                Triage.TriageRDCMan(mappings, server, false);
-
-                return;
+            if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk"))
+            {
+                Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' !");
             }
             else
             {
-                if (arguments.ContainsKey("/server"))
+                Triage.TriageUserCreds(masterkeys, server);
+                Triage.TriageUserVaults(masterkeys, server);
+                Console.WriteLine();
+                if (masterkeys.Count == 0)
                 {
-                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' !");
-                    return;
+                    // try to use CryptUnprotectData if no GUID lookups supplied
+                    Triage.TriageRDCMan(masterkeys, server, true);
                 }
                 else
                 {
-                    Triage.TriageUserCreds(arguments);
-                    Triage.TriageUserVaults(arguments);
-                    Console.WriteLine();
-                    if(arguments.Count == 0)
-                    {
-                        // try to use CryptUnprotectData if no GUID lookups supplied
-                        Triage.TriageRDCMan(arguments, "", true);
-                    }
-                    else
-                    {
-                        Triage.TriageRDCMan(arguments, "", false);
-                    }
+                    Triage.TriageRDCMan(masterkeys, server, false);
                 }
             }
         }

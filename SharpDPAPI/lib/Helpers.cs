@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace SharpDPAPI
@@ -71,6 +72,152 @@ namespace SharpDPAPI
         public static string RemoveWhiteSpaces(string input)
         {
             return Regex.Replace(input, @"\ +(?=(\n|\r?$))", "");
+        }
+
+        public static string StringToCSVCell(string str)
+        {
+            // helper that cleans a string for CSV output
+            bool mustQuote = (str.Contains(",") || str.Contains("\"") || str.Contains("\r") || str.Contains("\n"));
+            if (mustQuote)
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.Append("\"");
+                foreach (char nextChar in str)
+                {
+                    sb.Append(nextChar);
+                    if (nextChar == '"')
+                        sb.Append("\"");
+                }
+                sb.Append("\"");
+                return sb.ToString();
+            }
+
+            return str;
+        }
+
+        public static string CleanForJSON(string s)
+        {
+            // helper that cleans a string for JSON output
+            // https://stackoverflow.com/questions/1242118/how-to-escape-json-string/17691629#17691629
+
+            if (s == null || s.Length == 0)
+            {
+                return "";
+            }
+
+            char c = '\0';
+            int i;
+            int len = s.Length;
+            StringBuilder sb = new StringBuilder(len + 4);
+            String t;
+
+            for (i = 0; i < len; i += 1)
+            {
+                c = s[i];
+                switch (c)
+                {
+                    case '\\':
+                    case '"':
+                        sb.Append('\\');
+                        sb.Append(c);
+                        break;
+                    case '/':
+                        sb.Append('\\');
+                        sb.Append(c);
+                        break;
+                    case '\b':
+                        sb.Append("\\b");
+                        break;
+                    case '\t':
+                        sb.Append("\\t");
+                        break;
+                    case '\n':
+                        sb.Append("\\n");
+                        break;
+                    case '\f':
+                        sb.Append("\\f");
+                        break;
+                    case '\r':
+                        sb.Append("\\r");
+                        break;
+                    default:
+                        if (c < ' ')
+                        {
+                            t = "000" + String.Format("X", c);
+                            sb.Append("\\u" + t.Substring(t.Length - 4));
+                        }
+                        else
+                        {
+                            sb.Append(c);
+                        }
+                        break;
+                }
+            }
+            return sb.ToString();
+        }
+
+        public static DateTime ConvertToDateTime(string chromeTime)
+        {
+            // helper that converts Chrome's stupid timestamp format
+            // https://stackoverflow.com/questions/20458406/what-is-the-format-of-chromes-timestamps
+            // https://linuxsleuthing.blogspot.com/2011/06/decoding-google-chrome-timestamps-in.html
+            DateTime epoch = new DateTime(1601, 1, 1);
+            long dateCreatedRaw = long.Parse(chromeTime);
+            long secsFromEpoch = dateCreatedRaw / 1000000;
+            return epoch.Add(TimeSpan.FromSeconds(secsFromEpoch));
+        }
+
+        public static Dictionary<string, string> ParseMasterKeyFile(string filePath)
+        {
+            // helper that parses a {GUID}:SHA1 masterkey file
+            Dictionary<string, string> masterkeys = new Dictionary<string, string>();
+
+            if (File.Exists(filePath))
+            {
+                string[] lines = File.ReadAllLines(filePath);
+                try
+                {
+                    foreach (string line in lines)
+                    {
+                        string[] parts = line.Split(' '); // in case we have multiple keys on one line
+                        foreach (string part in parts)
+                        {
+                            if (!String.IsNullOrEmpty(part.Trim()))
+                            {
+                                if (part.StartsWith("{"))
+                                {
+                                    // SharpDPAPI {GUID}:SHA1 format
+                                    string[] mk = part.Split(':');
+                                    if (!masterkeys.ContainsKey(mk[0]))
+                                    {
+                                        masterkeys.Add(mk[0], mk[1]);
+                                    }
+                                }
+                                else if (part.StartsWith("GUID:"))
+                                {
+                                    // Mimikatz dpapi::cache format
+                                    string[] mk = part.Split(';');
+                                    string[] guid = mk[0].Split(':');
+                                    string[] sha1 = mk[1].Split(':');
+                                    if (!masterkeys.ContainsKey(guid[0]))
+                                    {
+                                        masterkeys.Add(guid[1], sha1[1]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("[X] Error parsing masterkey file '{0}' : {1}", filePath, e.Message);
+                }
+            }
+            else
+            {
+                Console.WriteLine("[X] Masterkey file '{0}' doesn't exist!", filePath);
+            }
+            return masterkeys;
         }
 
         public static bool GetSystem()
