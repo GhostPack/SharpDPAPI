@@ -147,7 +147,12 @@ namespace SharpDPAPI
                 foreach (string directory in systemDirs)
                 {
                     string[] machineFiles = Directory.GetFiles(directory);
-                    string[] userFiles = Directory.GetFiles(String.Format("{0}\\User\\", directory));
+                    string[] userFiles = new string[0];
+
+                    if (Directory.Exists(String.Format("{0}\\User\\", directory)))
+                    {
+                        userFiles = Directory.GetFiles(String.Format("{0}\\User\\", directory));
+                    }
 
                     foreach (string file in machineFiles)
                     {
