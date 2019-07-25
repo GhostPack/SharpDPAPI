@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 
 namespace SharpDPAPI.Commands
 {
@@ -10,9 +11,17 @@ namespace SharpDPAPI.Commands
 
         public void Execute(Dictionary<string, string> arguments)
         {
-            Console.WriteLine("\r\n[*]  Action: Describe DPAPI blob\r\n");
+            Console.WriteLine("\r\n[*] Action: Describe DPAPI blob");
 
             byte[] blobBytes;
+            bool unprotect = false;         // whether to force CryptUnprotectData()
+
+            if (arguments.ContainsKey("/unprotect"))
+            {
+                Console.WriteLine("\r\n[*] Using CryptUnprotectData() for decryption.");
+                unprotect = true;
+            }
+            Console.WriteLine();
 
             if (arguments.ContainsKey("/target"))
             {
@@ -51,18 +60,35 @@ namespace SharpDPAPI.Commands
                 masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);
             }
 
-            byte[] decBytes = Dpapi.DescribeDPAPIBlob(blobBytes, masterkeys, "blob");
+            //byte[] decBytes = Dpapi.DescribeDPAPIBlob(blobBytes, masterkeys, "blob", unprotect);
 
-            if (decBytes.Length != 0)
+            if (blobBytes.Length > 0)
             {
-                if (Helpers.IsUnicode(decBytes))
+                byte[] decBytesRaw = Dpapi.DescribeDPAPIBlob(blobBytes, masterkeys, "blob", unprotect);
+
+                if ((decBytesRaw != null) && (decBytesRaw.Length != 0))
                 {
-                    Console.WriteLine("    dec(blob)        : {0}", System.Text.Encoding.Unicode.GetString(decBytes));
-                }
-                else
-                {
-                    string b64DecBytesString = BitConverter.ToString(decBytes).Replace("-", " ");
-                    Console.WriteLine("    dec(blob)        : {0}", b64DecBytesString);
+                    if (Helpers.IsUnicode(decBytesRaw))
+                    {
+                        string data = "";
+                        int finalIndex = Array.LastIndexOf(decBytesRaw, (byte)0);
+                        if (finalIndex > 1)
+                        {
+                            byte[] decBytes = new byte[finalIndex + 1];
+                            Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
+                            data = Encoding.Unicode.GetString(decBytes);
+                        }
+                        else
+                        {
+                            data = Encoding.ASCII.GetString(decBytesRaw);
+                        }
+                        Console.WriteLine("    dec(blob)        : {0}", data);
+                    }
+                    else
+                    {
+                        string hexData = BitConverter.ToString(decBytesRaw).Replace("-", " ");
+                        Console.WriteLine("    dec(blob)        : {0}", hexData);
+                    }
                 }
             }
         }

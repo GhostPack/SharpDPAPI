@@ -574,6 +574,63 @@ namespace SharpDPAPI
             }
         }
 
+        public static void TriagePSCredFile(Dictionary<string, string> MasterKeys, string credFile, bool unprotect = false)
+        {
+            // triage a saved PSCredential .xml
+            //  example - `Get-Credential | Export-Clixml -Path C:\Temp\cred.xml`
+
+            if (System.IO.File.Exists(credFile))
+            {
+                DateTime lastAccessed = System.IO.File.GetLastAccessTime(credFile);
+                DateTime lastModified = System.IO.File.GetLastWriteTime(credFile);
+
+                XmlDocument xmlDoc = new XmlDocument();
+                xmlDoc.Load(credFile);
+
+                Console.WriteLine("    CredFile         : {0}", credFile);
+                Console.WriteLine("    Accessed         : {0}", lastAccessed);
+                Console.WriteLine("    Modified         : {0}", lastModified);
+
+                XmlNodeList props = xmlDoc.GetElementsByTagName("Props");
+                if(props.Count > 0)
+                {
+                    string userName = props[0].ChildNodes[0].InnerText;
+                    string dpapiBlob = props[0].ChildNodes[1].InnerText;
+
+                    Console.WriteLine("    User Name        : {0}", userName);
+
+                    byte[] blobBytes = Helpers.StringToByteArray(dpapiBlob);
+
+                    if (blobBytes.Length > 0)
+                    {
+                        byte[] decBytesRaw = Dpapi.DescribeDPAPIBlob(blobBytes, MasterKeys, "blob", unprotect);
+
+                        if ((decBytesRaw != null) && (decBytesRaw.Length != 0))
+                        {
+                            string password = "";
+                            int finalIndex = Array.LastIndexOf(decBytesRaw, (byte)0);
+                            if (finalIndex > 1)
+                            {
+                                byte[] decBytes = new byte[finalIndex + 1];
+                                Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
+                                password = Encoding.Unicode.GetString(decBytes);
+                            }
+                            else
+                            {
+                                password = Encoding.ASCII.GetString(decBytesRaw);
+                            }
+                            Console.WriteLine("    Password         : {0}", password);
+                        }
+                    }
+                }
+                Console.WriteLine();
+            }
+            else
+            {
+                Console.WriteLine("\r[X]  PSCredential .xml file '{0}' is not accessible or doesn't exist!\n", credFile);
+            }
+        }
+
         public static void TriageRDCManFile(Dictionary<string, string> MasterKeys, string rdcManFile, bool unprotect = false)
         {
             // triage a specific RDCMan.settings file

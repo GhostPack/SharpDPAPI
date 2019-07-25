@@ -39,6 +39,8 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       - [machinevaults](#machinevaults)
       - [machinetriage](#machinetriage)
     + [Misc](#misc)
+      - [ps](#ps)
+      - [blob](#ps)
       - [backupkey](#backupkey)
   * [SharpChrome Commands](#sharpchrome-commands)
     + [logins](#logins)
@@ -57,7 +59,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
-      v1.4.0
+      v1.5.0
 
 
 
@@ -81,18 +83,20 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
           SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>
 
 
-        Global arguments for the credentials|vaults|rdg|triage|blob commands:
+        Arguments for the credentials|vaults|rdg|triage|blob|ps commands:
 
             Decryption:
-                /unprotect      -   force use of CryptUnprotectData() (default for unprivileged execution)
-                GUID1:SHA1 ...  -   use a one or more GUID:SHA1 masterkeys for decryption
-                /mkfile:FILE    -   use a file of one or more GUID:SHA1 masterkeys for decryption
-                /pvk:BASE64...  -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
-                /pvk:key.pvk    -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+                /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
+                GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
+                /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
+                /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
+                /pvk:key.pvk        -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
 
             Targeting:
-                /target:FILE    -   triage a specific 'Credentials','.rdg|RDCMan.settings' file location, or 'Vault' folder
-                /server:SERVER  -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
+                /target:FILE/folder -   triage a specific 'Credentials','.rdg|RDCMan.settings', 'blob', or 'ps' file location, or 'Vault' folder
+                /server:SERVER      -   triage a remote server, assuming admin access ()
+                                        Note: must use with /pvk:KEY
+                                        Note: not applicable to 'blob' or 'ps' commands
 
 
 #### SharpChrome Command Line Usage
@@ -724,6 +728,188 @@ The **machinetriage** command runs the user [machinecredentials](#machinecredent
 
 
 ### Misc
+
+#### ps
+
+The **ps** command will describe/decrypt an exported PSCredential clixml. A `/target:FILE.xml` *must* be supplied.
+
+The command will a) decrypt the file with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+
+The `/unprotect` flag will use CryptUnprotectData() to decrypt the credenial .xml without masterkeys needed, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
+
+Decrypt an exported credential .xml using CryptProtectData() (the `/unprotect` flag):
+
+    PS C:\Temp> $SecPassword = ConvertTo-SecureString 'Password123!' -AsPlainText -Force
+    PS C:\Temp> New-Object System.Management.Automation.PSCredential('TESTLAB\user', $SecPassword) | Export-CLIXml C:\Temp\cred.xml
+    PS C:\Temp> .\SharpDPAPI.exe ps /target:C:\Temp\cred.xml /unprotect
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.5.0
+
+
+    [*] Action: Describe PSCredential .xml
+
+        CredFile         : C:\Temp\cred.xml
+        Accessed         : 7/25/2019 11:53:09 AM
+        Modified         : 7/25/2019 11:53:09 AM
+        User Name        : TESTLAB\user
+        guidMasterKey    : {0241bc33-44ae-404a-b05d-a35eea8cbc63}
+        size             : 170
+        flags            : 0x0
+        algHash/algCrypt : 32772 (CALG_SHA) / 26115 (CALG_3DES)
+        description      :
+        Password         : Password123!
+
+
+Using domain {GUID}:SHA1 masterkey mappings:
+
+    PS C:\Temp> $SecPassword = ConvertTo-SecureString 'Password123!' -AsPlainText -Force
+    PS C:\Temp> New-Object System.Management.Automation.PSCredential('TESTLAB\user', $SecPassword) | Export-CLIXml C:\Temp\cred.xml
+    PS C:\Temp> .\SharpDPAPI.exe ps /target:C:\Temp\cred.xml "{0241bc33-44ae-404a-b05d-a35eea8cbc63}:E7E481877B9D51C17E015EB3C1F72FB887363EE3"
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.5.0
+
+
+    [*] Action: Describe PSCredential .xml
+
+    [*] Using a domain DPAPI backup key to triage masterkeys for decryption key mappings!
+
+    [*] User master key cache:
+
+    {0241bc33-44ae-404a-b05d-a35eea8cbc63}:E7E481877B9D51C17E015EB3C1F72FB887363EE3
+
+        CredFile         : C:\Temp\cred.xml
+        Accessed         : 7/25/2019 12:04:12 PM
+        Modified         : 7/25/2019 12:04:12 PM
+        User Name        : TESTLAB\user
+        guidMasterKey    : {0241bc33-44ae-404a-b05d-a35eea8cbc63}
+        size             : 170
+        flags            : 0x0
+        algHash/algCrypt : 32772 (CALG_SHA) / 26115 (CALG_3DES)
+        description      :
+        Password         : Password123!
+
+
+Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
+
+    PS C:\Temp> $SecPassword = ConvertTo-SecureString 'Password123!' -AsPlainText -Force
+    PS C:\Temp> New-Object System.Management.Automation.PSCredential('TESTLAB\user', $SecPassword) | Export-CLIXml C:\Temp\cred.xml
+    PS C:\Temp> .\SharpDPAPI.exe ps /target:C:\Temp\cred.xml /pvk:HvG1sAAAAAABAAAAAAAAAAAAAAC...(snip)...
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.5.0
+
+
+    [*] Action: Describe PSCredential .xml
+
+    [*] Using a domain DPAPI backup key to triage masterkeys for decryption key mappings!
+
+    [*] User master key cache:
+
+    {0241bc33-44ae-404a-b05d-a35eea8cbc63}:E7E481877B9D51C17E015EB3C1F72FB887363EE3
+
+        CredFile         : C:\Temp\cred.xml
+        Accessed         : 7/25/2019 12:04:12 PM
+        Modified         : 7/25/2019 12:04:12 PM
+        User Name        : TESTLAB\user
+        guidMasterKey    : {0241bc33-44ae-404a-b05d-a35eea8cbc63}
+        size             : 170
+        flags            : 0x0
+        algHash/algCrypt : 32772 (CALG_SHA) / 26115 (CALG_3DES)
+        description      :
+        Password         : Password123!
+
+
+#### blob
+
+The **blob** command will describe/decrypt a DPAPI blob. A `/target:<BASE64|blob.bin>` *must* be supplied.
+
+The command will a) decrypt the blob with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+
+The `/unprotect` flag will use CryptUnprotectData() to decrypt the blob without masterkeys needed, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
+
+Decrypt a blob using CryptProtectData() (the `/unprotect` flag):
+
+C:\Temp>SharpDPAPI.exe blob /target:C:\Temp\blob.bin /unprotect
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.5.0
+
+
+    [*] Action: Describe DPAPI blob
+
+    [*] Using CryptUnprotectData() for decryption.
+
+        guidMasterKey    : {0241bc33-44ae-404a-b05d-a35eea8cbc63}
+        size             : 170
+        flags            : 0x0
+        algHash/algCrypt : 32772 (CALG_SHA) / 26115 (CALG_3DES)
+        description      :
+        dec(blob)        : Password123!
+
+
+Using domain {GUID}:SHA1 masterkey mappings:
+
+    C:\Temp>SharpDPAPI.exe blob /target:C:\Temp\blob2.bin {0241bc33-44ae-404a-b05d-a35eea8cbc63}:E7E481877B9D51C17E015EB3C1F72FB887363EE3
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.5.0
+
+
+    [*] Action: Describe DPAPI blob
+
+    [*] Using CryptUnprotectData() for decryption.
+
+        guidMasterKey    : {0241bc33-44ae-404a-b05d-a35eea8cbc63}
+        size             : 314
+        flags            : 0x0
+        algHash/algCrypt : 32772 (CALG_SHA) / 26115 (CALG_3DES)
+        description      :
+        dec(blob)        : 01 00 00 00 3F 3F 3F 3F 01 15 3F 11 3F 7A 00 3F 4F 3F 3F ...
+
+
+Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
+
+    C:\Temp>SharpDPAPI.exe blob /target:C:\Temp\blob2.bin /pvk:HvG1sAAAAAABAAAAAAAAAAAAAAC...(snip)...
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.5.0
+
+
+    [*] Action: Describe DPAPI blob
+
+    [*] Using a domain DPAPI backup key to triage masterkeys for decryption key mappings!
+
+    [*] User master key cache:
+
+    {0241bc33-44ae-404a-b05d-a35eea8cbc63}:E7E481877B9D51C17E015EB3C1F72FB887363EE3
+
+        guidMasterKey    : {0241bc33-44ae-404a-b05d-a35eea8cbc63}
+        size             : 314
+        flags            : 0x0
+        algHash/algCrypt : 32772 (CALG_SHA) / 26115 (CALG_3DES)
+        description      :
+        dec(blob)        : 01 00 00 00 3F 3F 3F 3F 01 15 3F 11 3F 7A 00 3F 4F 3F 3F ...
+
 
 #### backupkey
 

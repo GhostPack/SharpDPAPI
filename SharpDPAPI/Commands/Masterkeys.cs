@@ -10,7 +10,7 @@ namespace SharpDPAPI.Commands
 
         public void Execute(Dictionary<string, string> arguments)
         {
-            Console.WriteLine("\r\n[*]  Action: User DPAPI Masterkey File Triage\r\n");
+            Console.WriteLine("\r\n[*] Action: User DPAPI Masterkey File Triage\r\n");
 
             byte[] backupKeyBytes;
 

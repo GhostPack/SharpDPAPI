@@ -10,7 +10,7 @@ namespace SharpDPAPI.Commands
 
         public void Execute(Dictionary<string, string> arguments)
         {
-            Console.WriteLine("\r\n[*] Action: RDG Triage\r\n");
+            Console.WriteLine("\r\n[*] Action: RDG Triage");
             arguments.Remove("rdg");
 
             string server = "";             // used for remote server specification
@@ -18,8 +18,10 @@ namespace SharpDPAPI.Commands
 
             if (arguments.ContainsKey("/unprotect"))
             {
+                Console.WriteLine("\r\n[*] Using CryptUnprotectData() for decryption.");
                 unprotect = true;
             }
+            Console.WriteLine("");
 
             if (arguments.ContainsKey("/server"))
             {

@@ -25,6 +25,7 @@ namespace SharpDPAPI.Domain
             _availableCommands.Add(Machinetriage.CommandName, () => new Machinetriage());
             _availableCommands.Add(Machinevaults.CommandName, () => new Machinevaults());
             _availableCommands.Add(Masterkeys.CommandName, () => new Masterkeys());
+            _availableCommands.Add(PS.CommandName, () => new PS());
             _availableCommands.Add(RDG.CommandName, () => new RDG());
             _availableCommands.Add(UserTriage.CommandName, () => new UserTriage());
             _availableCommands.Add(Vaults.CommandName, () => new Vaults());

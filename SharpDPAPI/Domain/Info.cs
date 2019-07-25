@@ -37,18 +37,20 @@ User Triage:
       SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>    
 
 
-    Global arguments for the credentials|vaults|rdg|triage|blob commands:
+    Arguments for the credentials|vaults|rdg|triage|blob|ps commands:
 
         Decryption:
-            /unprotect      -   force use of CryptUnprotectData() (default for unprivileged execution)
-            GUID1:SHA1 ...  -   use a one or more GUID:SHA1 masterkeys for decryption
-            /mkfile:FILE    -   use a file of one or more GUID:SHA1 masterkeys for decryption
-            /pvk:BASE64...  -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
-            /pvk:key.pvk    -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+            /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
+            GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
+            /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
+            /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
+            /pvk:key.pvk        -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
 
         Targeting:
-            /target:FILE    -   triage a specific 'Credentials','.rdg|RDCMan.settings' file location, or 'Vault' folder
-            /server:SERVER  -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
+            /target:FILE/folder -   triage a specific 'Credentials','.rdg|RDCMan.settings', 'blob', or 'ps' file location, or 'Vault' folder
+            /server:SERVER      -   triage a remote server, assuming admin access
+                                    Note: must use with /pvk:KEY
+                                    Note: not applicable to 'blob' or 'ps' commands
 
 ";
             Console.WriteLine(usage);
