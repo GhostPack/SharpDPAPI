@@ -162,9 +162,26 @@ namespace SharpDPAPI
             // https://stackoverflow.com/questions/20458406/what-is-the-format-of-chromes-timestamps
             // https://linuxsleuthing.blogspot.com/2011/06/decoding-google-chrome-timestamps-in.html
             DateTime epoch = new DateTime(1601, 1, 1);
-            long dateCreatedRaw = long.Parse(chromeTime);
-            long secsFromEpoch = dateCreatedRaw / 1000000;
-            return epoch.Add(TimeSpan.FromSeconds(secsFromEpoch));
+            try
+            {
+                double dateCreatedRaw = double.Parse(chromeTime);
+                double secsFromEpoch = dateCreatedRaw / 1000000;
+                if (secsFromEpoch > TimeSpan.MaxValue.TotalSeconds)
+                {
+                    // handle timestamps over the allowed range
+                    return new DateTime(DateTime.MaxValue.Ticks);
+                }
+                if (secsFromEpoch < 0)
+                {
+                    secsFromEpoch = 0;
+                }
+                return epoch.Add(TimeSpan.FromSeconds(secsFromEpoch)).ToLocalTime();
+            }
+            catch
+            {
+                // in case the parsing fails
+                return epoch;
+            }
         }
 
         public static Dictionary<string, string> ParseMasterKeyFile(string filePath)

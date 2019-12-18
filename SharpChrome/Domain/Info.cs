@@ -39,6 +39,7 @@ Global arguments for the 'cookies' and 'logins' commands:
         /cookie:""REGEX""   -   only return cookies where the cookie name matches the supplied regex
         /url:""REGEX""      -   only return cookies where the cookie URL matches the supplied regex
         /format:json        -   output cookie values in an EditThisCookie JSON import format. Best when used with a regex!
+        /setneverexpire     -   set expirations for cookies output to now + 100 years (for json output)
 
 
 Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:

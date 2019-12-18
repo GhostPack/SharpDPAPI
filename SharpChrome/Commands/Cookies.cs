@@ -17,6 +17,7 @@ namespace SharpChrome.Commands
             string server = "";             // used for remote server specification
             bool showAll = false;           // whether to display entries with null passwords
             bool unprotect = false;         // whether to force CryptUnprotectData()
+            bool setneverexpire = false;    // set cookie output expiration dates to now + 100 years
             string cookieRegex = "";        // regex to search for specific cookie names
             string urlRegex = "";           // regex to search for specific URLs for cookies
 
@@ -40,9 +41,23 @@ namespace SharpChrome.Commands
                 unprotect = true;
             }
 
+            if (arguments.ContainsKey("/setneverexpire"))
+            {
+                setneverexpire = true;
+            }
+
             if (arguments.ContainsKey("/showall"))
             {
                 showAll = true;
+            }
+
+            if(showAll)
+            {
+                Console.WriteLine("[*] Triaging all cookies, including expired ones.");
+            }
+            else
+            {
+                Console.WriteLine("[*] Triaging non-expired cookies. Use '/showall' to display ALL cookies.");
             }
 
             if (arguments.ContainsKey("/server"))
@@ -92,7 +107,7 @@ namespace SharpChrome.Commands
                 }
                 else
                 {
-                    Chrome.TriageChromeCookies(masterkeys, server, displayFormat, showAll, unprotect, cookieRegex, urlRegex);
+                    Chrome.TriageChromeCookies(masterkeys, server, displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire);
                 }
             }
         }

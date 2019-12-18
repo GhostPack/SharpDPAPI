@@ -105,7 +105,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  /  |_  ._ _  ._ _   _
      __) | | (_| |  |_) \_ | | | (_) | | | (/_
                     |
-      v1.4.0
+      v1.5.1
 
 
     Global arguments for the 'cookies' and 'logins' commands:
@@ -131,6 +131,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /cookie:"REGEX"   -   only return cookies where the cookie name matches the supplied regex
             /url:"REGEX"      -   only return cookies where the cookie URL matches the supplied regex
             /format:json        -   output cookie values in an EditThisCookie JSON import format. Best when used with a regex!
+            /setneverexpire     -   set expirations for cookies output to now + 100 years
 
 
     Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
