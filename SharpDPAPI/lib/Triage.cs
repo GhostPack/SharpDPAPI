@@ -17,10 +17,10 @@ namespace SharpDPAPI
 
             Dictionary<string, string> mappings = new Dictionary<string, string>();
 
-            if(!String.IsNullOrEmpty(computerName))
+            if (!String.IsNullOrEmpty(computerName))
             {
                 bool canAccess = Helpers.TestRemote(computerName);
-                if(!canAccess)
+                if (!canAccess)
                 {
                     return new Dictionary<string, string>();
                 }
@@ -126,7 +126,57 @@ namespace SharpDPAPI
 
             return mappings;
         }
+        public static Dictionary<string, string> TriageUserMasterKeysWithPass(string password, bool show = false)
+        {
+            Dictionary<string, string> mappings = new Dictionary<string, string>();
+            string userName = Environment.GetEnvironmentVariable("USERNAME");
+            string userDPAPIBasePath = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Protect\\", System.Environment.GetEnvironmentVariable("USERPROFILE"));
 
+            if (System.IO.Directory.Exists(userDPAPIBasePath))
+            {
+                string[] directories = Directory.GetDirectories(userDPAPIBasePath);
+                foreach (string directory in directories)
+                {
+                    string[] files = Directory.GetFiles(directory);
+                    string domain = System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().DomainName;
+                    Dpapi.CalculateKeys(password, directory, false);
+
+                    byte[] hmacbytes;
+
+                    if (domain == "")
+                    {
+                        hmacbytes = Dpapi.CalculateKeys(password, directory, false); //convert user password to SHA1
+                    }
+                    else
+                    {
+                        hmacbytes = Dpapi.CalculateKeys(password, directory, true);
+                    }
+
+                    foreach (string file in files)
+                    {
+                        if (Regex.IsMatch(file, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
+                        {
+                            string fileName = System.IO.Path.GetFileName(file);
+                            if (show)
+                            {
+                                Console.WriteLine("[*] Found MasterKey : {0}", file);
+                            }
+                            byte[] masteyKeyBytes = File.ReadAllBytes(file);
+                            try
+                            {
+                                Dictionary<string, string> mapping = Dpapi.DecryptMasterKeyWithSha(masteyKeyBytes, hmacbytes);
+                                mapping.ToList().ForEach(x => mappings.Add(x.Key, x.Value));
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
+                            }
+                        }
+                    }
+                }
+            }
+            return mappings;
+        }
         public static Dictionary<string, string> TriageSystemMasterKeys(bool show = false)
         {
             // retrieve the DPAPI_SYSTEM key and use it to decrypt any SYSTEM DPAPI masterkeys
@@ -307,7 +357,7 @@ namespace SharpDPAPI
                             String.Format("{0}\\AppData\\Roaming\\Microsoft\\Vault\\", dir)
                         };
 
-                        foreach(string location in folderLocations)
+                        foreach (string location in folderLocations)
                         {
                             if (Directory.Exists(location))
                             {
@@ -456,9 +506,10 @@ namespace SharpDPAPI
                             {
                                 byte[] vaultCredBytes = File.ReadAllBytes(vaultCredFile);
 
-                                try {
+                                try
+                                {
                                     // describe the vault credential file using the Policy credentials
-                                    Dpapi.DescribeVaultCred(vaultCredBytes, keys);   
+                                    Dpapi.DescribeVaultCred(vaultCredBytes, keys);
                                 }
                                 catch (Exception e)
                                 {
@@ -514,7 +565,8 @@ namespace SharpDPAPI
             byte[] credentialArray = File.ReadAllBytes(credFilePath);
 
             // describe and possibly parse the credential blob
-            try {
+            try
+            {
                 Dpapi.DescribeCredential(credentialArray, MasterKeys);
             }
             catch (Exception e)
@@ -592,7 +644,7 @@ namespace SharpDPAPI
                 Console.WriteLine("    Modified         : {0}", lastModified);
 
                 XmlNodeList props = xmlDoc.GetElementsByTagName("Props");
-                if(props.Count > 0)
+                if (props.Count > 0)
                 {
                     string userName = props[0].ChildNodes[0].InnerText;
                     string dpapiBlob = props[0].ChildNodes[1].InnerText;
@@ -688,7 +740,7 @@ namespace SharpDPAPI
                 // grab the recent RDG files
                 XmlNodeList filesToOpen = xmlDoc.GetElementsByTagName("FilesToOpen");
                 XmlNodeList items = filesToOpen[0].ChildNodes;
-                
+
                 // triage recently used RDG files                
                 foreach (XmlNode rdgFile in items)
                 {
@@ -732,7 +784,8 @@ namespace SharpDPAPI
                 // have a profile name only
                 Console.WriteLine("          Cred Profile : {0}", profileName);
             }
-            else {
+            else
+            {
                 string userName = credProfileNode["userName"].InnerText.Trim();
                 string domain = credProfileNode["domain"].InnerText.Trim();
                 string b64Password = credProfileNode["password"].InnerText;
@@ -790,7 +843,7 @@ namespace SharpDPAPI
 
                 XmlNodeList credProfileNodes = xmlDoc.GetElementsByTagName("credentialsProfile");
 
-                if((credProfileNodes != null) && (credProfileNodes.Count != 0))
+                if ((credProfileNodes != null) && (credProfileNodes.Count != 0))
                 {
                     Console.WriteLine("\r\n        Cred Profiles");
                 }
@@ -811,9 +864,9 @@ namespace SharpDPAPI
                 {
                     try
                     {
-                        if((server["properties"]["name"] != null))
+                        if ((server["properties"]["name"] != null))
                         {
-                            if(server["properties"]["displayName"] != null)
+                            if (server["properties"]["displayName"] != null)
                             {
                                 Console.WriteLine("\r\n          Name         : {0} ({1})", server["properties"]["name"].InnerText, server["properties"]["displayName"].InnerText);
                             }
@@ -828,7 +881,8 @@ namespace SharpDPAPI
                             }
                         }
                     }
-                    catch (Exception e) {
+                    catch (Exception e)
+                    {
                         Console.WriteLine("Exception: {0}", e);
                     }
                 }

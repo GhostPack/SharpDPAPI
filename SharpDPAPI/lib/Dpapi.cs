@@ -926,6 +926,72 @@ namespace SharpDPAPI
 
             return masterKeySubBytes;
         }
+        public static byte[] CalculateKeys(string password, string directory, bool domain)
+        {
+            string userDPAPIBasePath = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Protect\\", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+            string usersid = Path.GetFileName(directory).TrimEnd(Path.DirectorySeparatorChar);
+
+            var utf16pass = System.Text.Encoding.Unicode.GetBytes(password);
+            var utf16sid = System.Text.Encoding.Unicode.GetBytes(usersid);
+
+            byte[] utf16sidfinal = new byte[utf16sid.Length + 2];
+            utf16sid.CopyTo(utf16sidfinal, 0);
+            utf16sidfinal[utf16sidfinal.Length - 2] = 0x00;
+
+            byte[] sha1bytes_password;
+            byte[] hmacbytes;
+
+            if (!domain)
+            {
+                //Calculate SHA1 from user password
+                using (System.Security.Cryptography.SHA1Managed sha1 = new System.Security.Cryptography.SHA1Managed())
+                {
+                    sha1bytes_password = sha1.ComputeHash(utf16pass);
+                }
+                byte[] combined = Helpers.Combine(sha1bytes_password, utf16sidfinal);
+                using (System.Security.Cryptography.HMACSHA1 hmac = new System.Security.Cryptography.HMACSHA1(sha1bytes_password))
+                {
+                    hmacbytes = hmac.ComputeHash(utf16sidfinal);
+                }
+                return hmacbytes;
+            }
+            else
+            {
+                //Calculate NTLM from user password
+                var hashid = new Crypto.HashByID(32770); //32770 NTLM MD4
+                var ntlm = hashid.ComputeHash(utf16pass);
+                byte[] combinedNTLM = Helpers.Combine(ntlm, utf16sidfinal);
+                byte[] ntlmhmacbytes;
+
+                //Calculate SHA1 of NTLM from user password
+                using (System.Security.Cryptography.HMACSHA1 hmac = new System.Security.Cryptography.HMACSHA1(ntlm))
+                {
+                    ntlmhmacbytes = hmac.ComputeHash(utf16sidfinal);
+                }
+
+                byte[] tmpbytes1;
+                byte[] tmpbytes2;
+                byte[] tmpkey3bytes;
+
+                using (var hMACSHA256 = new HMACSHA256())
+                {
+                    var deriveBytes = new Pbkdf2(hMACSHA256, ntlm, utf16sid, 10000);
+                    tmpbytes1 = deriveBytes.GetBytes(32, "sha256");
+                }
+
+                using (var hMACSHA256 = new HMACSHA256())
+                {
+                    var deriveBytes = new Pbkdf2(hMACSHA256, tmpbytes1, utf16sid, 1);
+                    tmpbytes2 = deriveBytes.GetBytes(16, "sha256");
+                }
+
+                using (System.Security.Cryptography.HMACSHA1 hmac = new System.Security.Cryptography.HMACSHA1(tmpbytes2))
+                {
+                    tmpkey3bytes = hmac.ComputeHash(utf16sidfinal);
+                }
+                return tmpkey3bytes;
+            }
+        }
 
         public static Dictionary<string, string> DecryptMasterKey(byte[] masterKeyBytes, byte[] backupKeyBytes)
         {

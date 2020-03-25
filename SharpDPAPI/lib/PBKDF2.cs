@@ -108,7 +108,8 @@ namespace PBKDF2 {
         /// </summary>
         /// <param name="count">Number of bytes to return.</param>
         /// <returns>Byte array.</returns>
-        public Byte[] GetBytes(int count) {
+        /// 
+        public Byte[] GetBytes(int count, string algorithm = "sha512") {
             byte[] result = new byte[count];
             int resultOffset = 0;
             int bufferCount = this.BufferEndIndex - this.BufferStartIndex;
@@ -126,7 +127,10 @@ namespace PBKDF2 {
 
             while (resultOffset < count) {
                 int needCount = count - resultOffset;
-                this.BufferBytes = this.Func();
+                if (algorithm.ToLower() == "sha256")
+                    this.BufferBytes = this.Func(false);
+                else
+                    this.BufferBytes = this.Func();
                 if (needCount > this.BlockSize) { //we one (or more) additional passes
                     Buffer.BlockCopy(this.BufferBytes, 0, result, resultOffset, this.BlockSize);
                     resultOffset += this.BlockSize;
@@ -141,7 +145,7 @@ namespace PBKDF2 {
         }
 
 
-        private byte[] Func() {
+        private byte[] Func(bool mscrypto = true) {
             var hash1Input = new byte[this.Salt.Length + 4];
             Buffer.BlockCopy(this.Salt, 0, hash1Input, 0, this.Salt.Length);
             Buffer.BlockCopy(GetBytesFromInt(this.BlockIndex), 0, hash1Input, this.Salt.Length, 4);
@@ -153,7 +157,8 @@ namespace PBKDF2 {
                 for (int j = 0; j < this.BlockSize; j++) {
                     finalHash[j] = (byte)(finalHash[j] ^ hash1[j]);
                 }
-                Array.Copy(finalHash, hash1, hash1.Length); // "thank you MS!" -@gentilkiwi
+                if (mscrypto)
+                    Array.Copy(finalHash, hash1, hash1.Length); // "thank you MS!" -@gentilkiwi
                 // https://github.com/gentilkiwi/mimikatz/blob/110a831ebe7b529c5dd3010f9e7fced0d3e3a46c/modules/kull_m_crypto.c#L207
             }
 

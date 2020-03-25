@@ -13,16 +13,24 @@ namespace SharpDPAPI.Commands
             Console.WriteLine("\r\n[*] Action: User DPAPI Credential Triage\r\n");
             arguments.Remove("credentials");
 
+            Dictionary<string, string> masterkeys = new Dictionary<string, string>();
             string server = "";             // used for remote server specification
+            string password = "";
 
             if (arguments.ContainsKey("/server"))
             {
                 server = arguments["/server"];
                 Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
             }
+            if (arguments.ContainsKey("/password"))
+            {
+                password = arguments["/password"];
+                Console.WriteLine("[*] Will decrypt credentials with user password: {0}\r\n", password);
+                masterkeys = Triage.TriageUserMasterKeysWithPass(password);
+            }
 
             // {GUID}:SHA1 keys are the only ones that don't start with /
-            Dictionary<string, string> masterkeys = new Dictionary<string, string>();
+            
             foreach (KeyValuePair<string, string> entry in arguments)
             {
                 if (!entry.Key.StartsWith("/"))

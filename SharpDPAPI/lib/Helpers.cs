@@ -91,10 +91,9 @@ namespace SharpDPAPI
                 sb.Append("\"");
                 return sb.ToString();
             }
-
             return str;
         }
-
+     
         public static string CleanForJSON(string s)
         {
             // helper that cleans a string for JSON output
