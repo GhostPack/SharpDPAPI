@@ -11,6 +11,7 @@ namespace SharpDPAPI
 {
     static public class Crypto
     {
+        //Avoided using BouncyCastle - https://stackoverflow.com/questions/46819638/c-sharp-ntlm-hash-calculator/52640221#52640221
         public class HashByID : HashAlgorithm
         {
             static readonly Dictionary<int, int> hashSizes = new Dictionary<int, int>() { { 0x8001, 128 }, { 0x8002, 128 }, { 0x8003, 128 }, { 0x8004, 160 }, { 0x8006, 128 }, { 0x8007, 160 }, { 0x800c, 256 }, { 0x800d, 384 }, { 0x800e, 512 } };
