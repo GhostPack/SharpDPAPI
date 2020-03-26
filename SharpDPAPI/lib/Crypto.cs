@@ -1,14 +1,41 @@
 ﻿using System;
-using System.ComponentModel;
-using System.IO;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
+using System.Runtime.InteropServices;
+using System.ComponentModel;
 
 namespace SharpDPAPI
 {
     public class Crypto
     {
+        public static string KerberosPasswordHash(Interop.KERB_ETYPE etype, string password, string salt = "", int count = 4096)
+        {
+            // use the internal KERB_ECRYPT HashPassword() function to calculate a password hash of a given etype
+            // adapted from @gentilkiwi's Mimikatz "kerberos::hash" implementation
+
+            Interop.KERB_ECRYPT pCSystem;
+            IntPtr pCSystemPtr;
+
+            // locate the crypto system for the hash type we want
+            int status = Interop.CDLocateCSystem(etype, out pCSystemPtr);
+
+            pCSystem = (Interop.KERB_ECRYPT)System.Runtime.InteropServices.Marshal.PtrToStructure(pCSystemPtr, typeof(Interop.KERB_ECRYPT));
+            if (status != 0)
+                throw new System.ComponentModel.Win32Exception(status, "Error on CDLocateCSystem");
+
+            // get the delegate for the password hash function
+            Interop.KERB_ECRYPT_HashPassword pCSystemHashPassword = (Interop.KERB_ECRYPT_HashPassword)System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer(pCSystem.HashPassword, typeof(Interop.KERB_ECRYPT_HashPassword));
+            Interop.UNICODE_STRING passwordUnicode = new Interop.UNICODE_STRING(password);
+            Interop.UNICODE_STRING saltUnicode = new Interop.UNICODE_STRING(salt);
+
+            byte[] output = new byte[pCSystem.KeySize];
+
+            int success = pCSystemHashPassword(passwordUnicode, saltUnicode, count, output);
+
+            if (status != 0)
+                throw new Win32Exception(status);
+
+            return System.BitConverter.ToString(output).Replace("-", "");
+        }
         public static byte[] DecryptBlob(byte[] ciphertext, byte[] key, int algCrypt = 26115, PaddingMode padding = PaddingMode.Zeros)
         {
             // decrypts a DPAPI blob using 3DES or AES
