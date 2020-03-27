@@ -59,6 +59,12 @@ namespace SharpDPAPI.Commands
             {
                 masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);
             }
+            else if (arguments.ContainsKey("/password"))
+            {
+                string password = arguments["/password"];
+                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
+                masterkeys = Triage.TriageUserMasterKeysWithPass(password);
+            }
 
             //byte[] decBytes = Dpapi.DescribeDPAPIBlob(blobBytes, masterkeys, "blob", unprotect);
 

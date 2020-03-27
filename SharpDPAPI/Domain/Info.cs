@@ -22,7 +22,7 @@ Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and 
   SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
 
 
-Machine Triage:
+Machine/SYSTEM Triage:
 
     machinemasterkeys       -   triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret)
     machinecredentials      -   use 'machinemasterkeys' and then triage machine Credential files
@@ -41,6 +41,7 @@ User Triage:
 
         Decryption:
             /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
+            /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function.
             GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
             /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
             /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
@@ -51,6 +52,10 @@ User Triage:
             /server:SERVER      -   triage a remote server, assuming admin access
                                     Note: must use with /pvk:KEY
                                     Note: not applicable to 'blob' or 'ps' commands
+
+
+Note: in most cases, just use *triage* if you're targeting user DPAPI secrets and *machinetriage* if you're going after SYSTEM DPAPI secrets.
+      These functions wrap all the other applicable functions that can be automatically run.
 
 ";
             Console.WriteLine(usage);

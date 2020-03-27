@@ -15,18 +15,11 @@ namespace SharpDPAPI.Commands
 
             Dictionary<string, string> masterkeys = new Dictionary<string, string>();
             string server = "";             // used for remote server specification
-            string password = "";
 
             if (arguments.ContainsKey("/server"))
             {
                 server = arguments["/server"];
                 Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
-            }
-            if (arguments.ContainsKey("/password"))
-            {
-                password = arguments["/password"];
-                Console.WriteLine("[*] Will decrypt credentials with user password: {0}\r\n", password);
-                masterkeys = Triage.TriageUserMasterKeysWithPass(password);
             }
 
             // {GUID}:SHA1 keys are the only ones that don't start with /
@@ -38,6 +31,7 @@ namespace SharpDPAPI.Commands
                     masterkeys.Add(entry.Key, entry.Value);
                 }
             }
+
             if (arguments.ContainsKey("/pvk"))
             {
                 // use a domain DPAPI backup key to triage masterkeys
@@ -46,6 +40,12 @@ namespace SharpDPAPI.Commands
             else if (arguments.ContainsKey("/mkfile"))
             {
                 masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);
+            }
+            else if (arguments.ContainsKey("/password"))
+            {
+                string password = arguments["/password"];
+                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
+                masterkeys = Triage.TriageUserMasterKeysWithPass(password);
             }
 
             if (arguments.ContainsKey("/target"))

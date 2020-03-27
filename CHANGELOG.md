@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.6.0] - 2020-03-27
+
+### Added
+* **SharpChrome** project
+    * Integrated new Chrome (v80+) AES statekey decryption from @djhohnstein's SharpChrome project.
+* **SharpDPAPI** project
+    * landed @lefterispan's PR that incorporates plaintext password masterkey decryption.
+    * expanded the PR to allow /password specification for all SharpDPAPI functions
+
+
 ## [1.5.1] - 2019-12-18
 
 ### Added

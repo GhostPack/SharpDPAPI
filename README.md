@@ -8,6 +8,8 @@
 
 The [SharpChrome](#sharpchrome) subproject is an adaptation of work from [@gentilkiwi](https://twitter.com/gentilkiwi) and [@djhohnstein](https://twitter.com/djhohnstein), specifically his [SharpChrome project](https://github.com/djhohnstein/SharpChrome/). However, this version of SharpChrome uses a different version of the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) that supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199). SharpChrome is built as a separate project in SharpDPAPI because of the size of the SQLite library utilized.
 
+SharpChrome also uses an minimized version of @AArnott's [BCrypt P/Invoke code](https://github.com/AArnott/pinvoke/tree/master/src/BCrypt) released under the MIT License.
+
 If you're unfamiliar with DPAPI, [check out this post](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/) for more background information. For more information on Credentials and Vaults in regards to DPAPI, check out Benjamin's [wiki entry on the subject.](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials)
 
 [@harmj0y](https://twitter.com/harmj0y) is the primary author of this port.
@@ -59,7 +61,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
-      v1.5.0
+      v1.6.0
 
 
 
@@ -68,7 +70,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
 
 
-    Machine Triage:
+    Machine/SYSTEM Triage:
 
         machinemasterkeys       -   triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret)
         machinecredentials      -   use 'machinemasterkeys' and then triage machine Credential files
@@ -87,6 +89,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
 
             Decryption:
                 /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
+                /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function.
                 GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
                 /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
                 /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
@@ -94,9 +97,13 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
 
             Targeting:
                 /target:FILE/folder -   triage a specific 'Credentials','.rdg|RDCMan.settings', 'blob', or 'ps' file location, or 'Vault' folder
-                /server:SERVER      -   triage a remote server, assuming admin access ()
+                /server:SERVER      -   triage a remote server, assuming admin access
                                         Note: must use with /pvk:KEY
                                         Note: not applicable to 'blob' or 'ps' commands
+
+
+    Note: in most cases, just use *triage* if you're targeting user DPAPI secrets and *machinetriage* if you're going after SYSTEM DPAPI secrets.
+          These functions wrap all the other applicable functions that can be automatically run.
 
 
 #### SharpChrome Command Line Usage
@@ -105,13 +112,14 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  /  |_  ._ _  ._ _   _
      __) | | (_| |  |_) \_ | | | (_) | | | (/_
                     |
-      v1.5.1
+      v1.6.0
 
 
     Global arguments for the 'cookies' and 'logins' commands:
 
         Decryption:
             /unprotect      -   force use of CryptUnprotectData() (default for unprivileged execution)
+            /password:X     -   first decrypt the current user's masterkeys using a plaintext password. Works with any function.
             GUID1:SHA1 ...  -   use a one or more GUID:SHA1 masterkeys for decryption
             /mkfile:FILE    -   use a file of one or more GUID:SHA1 masterkeys for decryption
             /pvk:BASE64...  -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
@@ -131,7 +139,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /cookie:"REGEX"   -   only return cookies where the cookie name matches the supplied regex
             /url:"REGEX"      -   only return cookies where the cookie URL matches the supplied regex
             /format:json        -   output cookie values in an EditThisCookie JSON import format. Best when used with a regex!
-            /setneverexpire     -   set expirations for cookies output to now + 100 years
+            /setneverexpire     -   set expirations for cookies output to now + 100 years (for json output)
 
 
     Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
@@ -162,6 +170,8 @@ For more offensive DPAPI information, [check here](https://www.harmj0y.net/blog/
 SharpChrome is a Chrome-specific implementation of SharpDPAPI capable of **cookies** and **logins** decryption/triage. It is built as a separate project in SharpDPAPI because of the size of the SQLite library utilized.
 
 Since Chrome Cookies/Login Data are saved without CRYPTPROTECT_SYSTEM, CryptUnprotectData() is back on the table. If SharpChrome is run from an unelevated contect, it will attempt to decrypt any logins/cookies for the current user using CryptUnprotectData(). A `/pvk:[BASE64|file.pvk]`, {GUID}:SHA1 lookup table, or `/mkfile:FILE` of {GUID}:SHA1 values can also be used to decrypt values. Also, the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) used (with a few modifications) supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199), meaning that Chrome does not have to be closed/target files do not have to be copied to another location.
+
+If Chrome is version 80+, an AES state key is stored in *AppData\Local\Google\Chrome\User Data\Local State* - this key is protected with DPAPI, so we can use CryptUnprotectData()/pvk/masterkey lookup tables to decrypt it. This AES key is then used to protect new cookie and login data entries.
 
 By default, cookies and logins are displayed as a csv - this can be changed with `/format:table` for table output, and `/format:json` for cookies specifically. The json option outputs cookies in a json format that can be imported into the [EditThisCookie](https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg?hl=en) Chrome extension for easy reuse.
 

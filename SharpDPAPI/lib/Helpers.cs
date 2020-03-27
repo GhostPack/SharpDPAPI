@@ -394,6 +394,18 @@ namespace SharpDPAPI
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
 
+        public static bool ByteArrayEquals(byte[] sourceArray, int sourceIndex, byte[] destArray, int destIndex, int len)
+        {
+            int j = destIndex;
+            for (int i = sourceIndex; i < sourceIndex + len; i++)
+            {
+                if (sourceArray[i] != destArray[j])
+                    return false;
+                j++;
+            }
+            return true;
+        }
+
         public static int ArrayIndexOf(byte[] arrayToSearchThrough, byte[] patternToFind, int offset = 0)
         {
             // helper to search for byte array patterns in another byte array
