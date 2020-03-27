@@ -1,10 +1,10 @@
-﻿using System;
+﻿using PBKDF2;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using PBKDF2;
 
 namespace SharpDPAPI
 {
@@ -160,7 +160,7 @@ namespace SharpDPAPI
             byte[] dataBytes = new byte[dataLen];
             Array.Copy(blobBytes, offset, dataBytes, 0, dataLen);
 
-            if ( (blobType.Equals("rdg") || blobType.Equals("blob") || blobType.Equals("chrome")) && unprotect )
+            if ((blobType.Equals("rdg") || blobType.Equals("blob") || blobType.Equals("chrome")) && unprotect)
             {
                 // use CryptUnprotectData()
                 byte[] entropy = new byte[0];
@@ -207,7 +207,8 @@ namespace SharpDPAPI
                 }
                 else if (algHash == 32772)
                 {
-                    try {
+                    try
+                    {
                         // grab the sha1(masterkey) from the cache
                         byte[] keyBytes = Helpers.StringToByteArray(MasterKeys[guidString].ToString());
 
@@ -242,7 +243,7 @@ namespace SharpDPAPI
                 {
                     return Encoding.Unicode.GetBytes(String.Format("MasterKey needed - {0}", guidString));
                 }
-                else if(blobType.Equals("chrome"))
+                else if (blobType.Equals("chrome"))
                 {
                     return Encoding.ASCII.GetBytes(String.Format("MasterKey needed - {0}", guidString));
                 }
@@ -289,7 +290,7 @@ namespace SharpDPAPI
 	                PKULL_M_CRED_VAULT_POLICY_KEY key;
                 } KULL_M_CRED_VAULT_POLICY, *PKULL_M_CRED_VAULT_POLICY;
             */
-            
+
             int offset = 0;
 
             int version = BitConverter.ToInt32(policyBytes, offset);
@@ -417,7 +418,7 @@ namespace SharpDPAPI
              */
 
             int numberOfAttributes = attributeMapLen / 12;
-            
+
             Dictionary<int, int> attributeMap = new Dictionary<int, int>();
 
             for (int i = 0; i < numberOfAttributes; ++i)
@@ -456,7 +457,7 @@ namespace SharpDPAPI
                 // skip cruft
                 attributeOffset += 16;
 
-                if(attribute.Key >= 100)
+                if (attribute.Key >= 100)
                 {
                     attributeOffset += 4; // id100 https://github.com/SecureAuthCorp/impacket/blob/13a65706273680c297caee0211460ef7369aa8ca/impacket/dpapi.py#L551-L552
                 }
@@ -506,7 +507,7 @@ namespace SharpDPAPI
                 }
             }
 
-            if ( (numberOfAttributes > 0) && (unk0 < 4) )
+            if ((numberOfAttributes > 0) && (unk0 < 4))
             {
                 // bullshit vault credential clear attributes...
 
@@ -520,7 +521,8 @@ namespace SharpDPAPI
                 int dataLen = BitConverter.ToInt32(clearBytes, cleatOffSet2);
                 cleatOffSet2 += 4;
 
-                if (dataLen > 2000) {
+                if (dataLen > 2000)
+                {
                     Console.WriteLine("    [*] Vault credential clear attribute is > 2000 bytes, skipping...");
                 }
 
@@ -594,7 +596,7 @@ namespace SharpDPAPI
             // skip unk
             offset += 4;
 
-            for(int i = 0; i < count; ++i)
+            for (int i = 0; i < count; ++i)
             {
                 int id = BitConverter.ToInt32(vaultItemBytes, offset);
                 offset += 4;
@@ -756,7 +758,7 @@ namespace SharpDPAPI
                 int aes128len = BitConverter.ToInt32(decBlobBytes, offset);
                 offset += 4;
 
-                if(aes128len != 16)
+                if (aes128len != 16)
                 {
                     Console.WriteLine("    [X] Error parsing decrypted Policy.vpol (aes128len != 16)");
                     return keys;
@@ -920,11 +922,79 @@ namespace SharpDPAPI
 
             long masterKeyLen = BitConverter.ToInt64(masterKeyBytes, offset);
             offset += 4 * 8; // skip the key length headers
-            
+
             byte[] masterKeySubBytes = new byte[masterKeyLen];
             Array.Copy(masterKeyBytes, offset, masterKeySubBytes, 0, masterKeyLen);
 
             return masterKeySubBytes;
+        }
+        public static byte[] CalculateKeys(string password, string directory, bool domain)
+        {
+            string userDPAPIBasePath = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Protect\\", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+            string usersid = Path.GetFileName(directory).TrimEnd(Path.DirectorySeparatorChar);
+
+            var utf16pass = System.Text.Encoding.Unicode.GetBytes(password);
+            var utf16sid = System.Text.Encoding.Unicode.GetBytes(usersid);
+
+            byte[] utf16sidfinal = new byte[utf16sid.Length + 2];
+            utf16sid.CopyTo(utf16sidfinal, 0);
+            utf16sidfinal[utf16sidfinal.Length - 2] = 0x00;
+
+            byte[] sha1bytes_password;
+            byte[] hmacbytes;
+
+            if (!domain)
+            {
+                //Calculate SHA1 from user password
+                using (System.Security.Cryptography.SHA1Managed sha1 = new System.Security.Cryptography.SHA1Managed())
+                {
+                    sha1bytes_password = sha1.ComputeHash(utf16pass);
+                }
+                byte[] combined = Helpers.Combine(sha1bytes_password, utf16sidfinal);
+                using (System.Security.Cryptography.HMACSHA1 hmac = new System.Security.Cryptography.HMACSHA1(sha1bytes_password))
+                {
+                    hmacbytes = hmac.ComputeHash(utf16sidfinal);
+                }
+                return hmacbytes;
+            }
+            else
+            {
+                //Calculate NTLM from user password
+                string rc4Hash = Crypto.KerberosPasswordHash(Interop.KERB_ETYPE.rc4_hmac, password);
+
+                var ntlm = Helpers.ConvertHexStringToByteArray(rc4Hash);
+
+                byte[] combinedNTLM = Helpers.Combine(ntlm, utf16sidfinal);
+                byte[] ntlmhmacbytes;
+
+                //Calculate SHA1 of NTLM from user password
+                using (System.Security.Cryptography.HMACSHA1 hmac = new System.Security.Cryptography.HMACSHA1(ntlm))
+                {
+                    ntlmhmacbytes = hmac.ComputeHash(utf16sidfinal);
+                }
+
+                byte[] tmpbytes1;
+                byte[] tmpbytes2;
+                byte[] tmpkey3bytes;
+
+                using (var hMACSHA256 = new HMACSHA256())
+                {
+                    var deriveBytes = new Pbkdf2(hMACSHA256, ntlm, utf16sid, 10000);
+                    tmpbytes1 = deriveBytes.GetBytes(32, "sha256");
+                }
+
+                using (var hMACSHA256 = new HMACSHA256())
+                {
+                    var deriveBytes = new Pbkdf2(hMACSHA256, tmpbytes1, utf16sid, 1);
+                    tmpbytes2 = deriveBytes.GetBytes(16, "sha256");
+                }
+
+                using (System.Security.Cryptography.HMACSHA1 hmac = new System.Security.Cryptography.HMACSHA1(tmpbytes2))
+                {
+                    tmpkey3bytes = hmac.ComputeHash(utf16sidfinal);
+                }
+                return tmpkey3bytes;
+            }
         }
 
         public static Dictionary<string, string> DecryptMasterKey(byte[] masterKeyBytes, byte[] backupKeyBytes)
@@ -1021,12 +1091,20 @@ namespace SharpDPAPI
                     }
                 }
                 else
+                if (algHash == 32777)
+                {
+                    // derive the "Pbkdf2/SHA1" key for the masterkey, using MS' silliness
+                    using (var hmac = new HMACSHA1())
+                    {
+                        var df = new Pbkdf2(hmac, shaBytes, salt, rounds);
+                        final = df.GetBytes(32);
+                    }
+                }
+                else
                 {
                     Console.WriteLine("[X] Note: alg hash  '{0} / 0x{1}' not currently supported!", algHash, algHash.ToString("X8"));
                     return mapping;
                 }
-
-                // TODO: support more than just CALG_AES_256 and CALG_SHA_512 !
 
                 // CALG_AES_256 == 26128 , CALG_SHA_512 == 32782
                 if ((algCrypt == 26128) && (algHash == 32782))
@@ -1050,7 +1128,7 @@ namespace SharpDPAPI
 
                     int outLen = plaintextBytes.Length;
                     int outputLen = outLen - 16 - HMACLen;
-                    
+
                     byte[] masterKeyFull = new byte[HMACLen];
 
                     // outLen - outputLen == 80 in this case
@@ -1060,7 +1138,7 @@ namespace SharpDPAPI
                     {
                         byte[] masterKeySha1 = sha1.ComputeHash(masterKeyFull);
                         string masterKeySha1Hex = BitConverter.ToString(masterKeySha1).Replace("-", "");
-                        
+
                         // CALG_SHA_512 == 32782
                         if (algHash == 32782)
                         {
@@ -1098,14 +1176,45 @@ namespace SharpDPAPI
                             return mapping;
                         }
                     }
+                }// Added support for 32777(CALG_HMAC) / 26115(CALG_3DES)
+                else if ((algCrypt == 26115) && (algHash == 32777))
+                {
+                    TripleDESCryptoServiceProvider desCryptoProvider = new TripleDESCryptoServiceProvider();
+
+                    byte[] ivBytes = new byte[8];
+                    byte[] key = new byte[24];
+
+                    Array.Copy(final, 24, ivBytes, 0, 8);
+                    Array.Copy(final, 0, key, 0, 24);
+
+                    desCryptoProvider.Key = key;
+                    desCryptoProvider.IV = ivBytes;
+                    desCryptoProvider.Mode = CipherMode.CBC;
+                    desCryptoProvider.Padding = PaddingMode.Zeros;
+
+                    byte[] plaintextBytes = desCryptoProvider.CreateDecryptor().TransformFinalBlock(encData, 0, encData.Length);
+                    byte[] decryptedkey = new byte[64];
+
+                    Array.Copy(plaintextBytes, 40, decryptedkey, 0, 64);
+                    using (SHA1Managed sha1 = new SHA1Managed())
+                    {
+                        byte[] masterKeySha1 = sha1.ComputeHash(decryptedkey);
+                        string masterKeySha1Hex = BitConverter.ToString(masterKeySha1).Replace("-", "");
+                        mapping.Add(guidMasterKey, masterKeySha1Hex);
+                    }
+                    return mapping;
                 }
                 else
                 {
                     Console.WriteLine("[X] Note: alg crypt '{0} / 0x{1}' not currently supported!", algCrypt, algCrypt.ToString("X8"));
                     return mapping;
                 }
+                return mapping;
             }
-            catch { }
+            catch(Exception ex)
+            {
+                Console.WriteLine("Exception: {0}", ex.ToString());
+            }
             return mapping;
         }
     }

@@ -13,6 +13,8 @@ namespace SharpDPAPI.Commands
             Console.WriteLine("\r\n[*] Action: User DPAPI Masterkey File Triage\r\n");
 
             byte[] backupKeyBytes;
+            string password;
+            Dictionary<string, string> mappings = new Dictionary<string, string>();
 
             if (arguments.ContainsKey("/pvk"))
             {
@@ -25,6 +27,23 @@ namespace SharpDPAPI.Commands
                 {
                     backupKeyBytes = Convert.FromBase64String(pvk64);
                 }
+                if (arguments.ContainsKey("/server"))
+                {
+                    Console.WriteLine("[*] Triaging remote server: {0}\r\n", arguments["/server"]);
+                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true, arguments["/server"]);
+                }
+                else
+                {
+                    Console.WriteLine();
+                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true);
+                }
+            }
+            else
+            if (arguments.ContainsKey("/password"))
+            {
+                password = arguments["/password"];
+                Console.WriteLine("[*] Will decrypt credentials with user password: {0}\r\n", password);
+                mappings = Triage.TriageUserMasterKeysWithPass(password);
             }
             else
             {
@@ -32,18 +51,9 @@ namespace SharpDPAPI.Commands
                 return;
             }
 
-            Dictionary<string, string> mappings = new Dictionary<string, string>();
 
-            if (arguments.ContainsKey("/server"))
-            {
-                Console.WriteLine("[*] Triaging remote server: {0}\r\n", arguments["/server"]);
-                mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true, arguments["/server"]);
-            }
-            else
-            {
-                Console.WriteLine();
-                mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true);
-            }
+
+
 
             if (mappings.Count == 0)
             {
