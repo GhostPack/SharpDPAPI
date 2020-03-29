@@ -51,7 +51,14 @@ namespace SharpDPAPI.Commands
             {
                 string password = arguments["/password"];
                 Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
-                masterkeys = Triage.TriageUserMasterKeysWithPass(password);
+                if (arguments.ContainsKey("/server"))
+                {
+                    masterkeys = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
+                }
+                else
+                {
+                    masterkeys = Triage.TriageUserMasterKeys(null, true, "", password);
+                }
             }
 
             if (arguments.ContainsKey("/target"))
@@ -75,9 +82,9 @@ namespace SharpDPAPI.Commands
             }
             else
             {
-                if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk"))
+                if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk") && !arguments.ContainsKey("/password"))
                 {
-                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' !");
+                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' or '/password:X' !");
                 }
                 else
                 {

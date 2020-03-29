@@ -41,7 +41,7 @@ User Triage:
 
         Decryption:
             /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
-            /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function.
+            /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
             GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
             /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
             /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys

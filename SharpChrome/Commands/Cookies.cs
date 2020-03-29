@@ -84,6 +84,19 @@ namespace SharpChrome.Commands
             {
                 masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);
             }
+            else if (arguments.ContainsKey("/password"))
+            {
+                string password = arguments["/password"];
+                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
+                if (arguments.ContainsKey("/server"))
+                {
+                    masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
+                }
+                else
+                {
+                    masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(null, true, "", password);
+                }
+            }
 
             if (arguments.ContainsKey("/target"))
             {
@@ -101,9 +114,9 @@ namespace SharpChrome.Commands
             }
             else
             {
-                if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk"))
+                if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk") && !arguments.ContainsKey("/password"))
                 {
-                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' !");
+                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' or '/password:X' !");
                 }
                 else
                 {

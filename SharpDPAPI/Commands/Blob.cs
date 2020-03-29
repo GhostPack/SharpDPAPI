@@ -63,7 +63,14 @@ namespace SharpDPAPI.Commands
             {
                 string password = arguments["/password"];
                 Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
-                masterkeys = Triage.TriageUserMasterKeysWithPass(password);
+                if (arguments.ContainsKey("/server"))
+                {
+                    masterkeys = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
+                }
+                else
+                {
+                    masterkeys = Triage.TriageUserMasterKeys(null, true, "", password);
+                }
             }
 
             //byte[] decBytes = Dpapi.DescribeDPAPIBlob(blobBytes, masterkeys, "blob", unprotect);

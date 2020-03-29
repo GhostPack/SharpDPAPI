@@ -42,11 +42,18 @@ namespace SharpDPAPI.Commands
             {
                 password = arguments["/password"];
                 Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
-                mappings = Triage.TriageUserMasterKeysWithPass(password);
+                if (arguments.ContainsKey("/server"))
+                {
+                    mappings = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
+                }
+                else
+                {
+                    mappings = Triage.TriageUserMasterKeys(null, true, "", password);
+                }
             }
             else
             {
-                Console.WriteLine("[X] A /pvk:BASE64 domain DPAPI backup key or /password must be supplied!");
+                Console.WriteLine("[X] A /pvk:BASE64 domain DPAPI backup key or /password:X must be supplied!");
                 return;
             }
 

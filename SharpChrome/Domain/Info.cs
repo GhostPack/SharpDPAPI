@@ -16,10 +16,16 @@ namespace SharpChrome.Domain
         public static void ShowUsage()
         {
             string usage = @"
+Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
+
+  SharpChrome backupkey [/server:SERVER.domain] [/file:key.pvk]
+
+
 Global arguments for the 'cookies' and 'logins' commands:
 
     Decryption:
         /unprotect      -   force use of CryptUnprotectData() (default for unprivileged execution)
+        /password:X     -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
         GUID1:SHA1 ...  -   use a one or more GUID:SHA1 masterkeys for decryption
         /mkfile:FILE    -   use a file of one or more GUID:SHA1 masterkeys for decryption
         /pvk:BASE64...  -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
@@ -41,10 +47,6 @@ Global arguments for the 'cookies' and 'logins' commands:
         /format:json        -   output cookie values in an EditThisCookie JSON import format. Best when used with a regex!
         /setneverexpire     -   set expirations for cookies output to now + 100 years (for json output)
 
-
-Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
-
-  SharpChrome backupkey [/server:SERVER.domain] [/file:key.pvk]
 ";
             Console.WriteLine(usage);
         }

@@ -61,7 +61,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
-      v1.6.0
+      v1.6.1
 
 
 
@@ -89,7 +89,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
 
             Decryption:
                 /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
-                /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function.
+                /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
                 GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
                 /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
                 /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
@@ -106,20 +106,26 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
           These functions wrap all the other applicable functions that can be automatically run.
 
 
+
 #### SharpChrome Command Line Usage
 
       __                 _
      (_  |_   _. ._ ._  /  |_  ._ _  ._ _   _
      __) | | (_| |  |_) \_ | | | (_) | | | (/_
                     |
-      v1.6.0
+      v1.6.1
+
+
+    Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
+
+      SharpChrome backupkey [/server:SERVER.domain] [/file:key.pvk]
 
 
     Global arguments for the 'cookies' and 'logins' commands:
 
         Decryption:
             /unprotect      -   force use of CryptUnprotectData() (default for unprivileged execution)
-            /password:X     -   first decrypt the current user's masterkeys using a plaintext password. Works with any function.
+            /password:X     -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
             GUID1:SHA1 ...  -   use a one or more GUID:SHA1 masterkeys for decryption
             /mkfile:FILE    -   use a file of one or more GUID:SHA1 masterkeys for decryption
             /pvk:BASE64...  -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
@@ -140,11 +146,6 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /url:"REGEX"      -   only return cookies where the cookie URL matches the supplied regex
             /format:json        -   output cookie values in an EditThisCookie JSON import format. Best when used with a regex!
             /setneverexpire     -   set expirations for cookies output to now + 100 years (for json output)
-
-
-    Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
-
-      SharpChrome backupkey [/server:SERVER.domain] [/file:key.pvk]
 
 
 ### Operational Usage

@@ -344,7 +344,7 @@ namespace SharpDPAPI
                 }
                 else
                 {
-                    Console.WriteLine("    [X] Error parsing decrypted Policy.vpol (AES keys not extracted)");
+                    Console.WriteLine("    [X] Error parsing decrypted Policy.vpol (AES keys not extracted, likely incorrect password for the associated masterkey)");
                     return new ArrayList();
                 }
             }
@@ -665,7 +665,22 @@ namespace SharpDPAPI
 
             long lastWritten = (long)BitConverter.ToInt64(decBlobBytes, offset);
             offset += 8;
-            System.DateTime lastWrittenTime = System.DateTime.FromFileTime(lastWritten);
+            System.DateTime lastWrittenTime = new System.DateTime();
+            try
+            {
+                // sanity check that decrypytion worked correctly
+                lastWrittenTime = System.DateTime.FromFileTime(lastWritten);
+                if((lastWrittenTime < System.DateTime.Now.AddYears(-20)) || (lastWrittenTime > System.DateTime.Now.AddYears(1)))
+                {
+                    Console.WriteLine("    [X] Decryption failed, likely incorrect password for the associated masterkey");
+                    return;
+                }
+            }
+            catch
+            {
+                Console.WriteLine("    [X] Decryption failed, likely incorrect password for the associated masterkey");
+                return;
+            }
             Console.WriteLine("    LastWritten      : {0}", lastWrittenTime);
 
             UInt32 unkFlagsOrSize = BitConverter.ToUInt32(decBlobBytes, offset);
