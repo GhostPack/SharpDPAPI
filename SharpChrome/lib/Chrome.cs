@@ -83,7 +83,7 @@ namespace SharpChrome
                 {
                     // try to decrypt the new v80+ AES state file key, if it exists
                     byte[] aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, true); // force /unprotect
-                    ParseChromeLogins(MasterKeys, loginDataPath, displayFormat, showAll, unprotect, aesStateKey);
+                    ParseChromeLogins(MasterKeys, loginDataPath, displayFormat, showAll, true, aesStateKey);
                 }
                 else
                 {
