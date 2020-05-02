@@ -13,11 +13,108 @@ namespace SharpDPAPI
 {
     public class Helpers
     {
+        public static void EncodeLength(BinaryWriter stream, int length)
+        {
+            if (length < 0) throw new ArgumentOutOfRangeException("length", "Length must be non-negative");
+            if (length < 0x80)
+            {
+                // Short form
+                stream.Write((byte)length);
+            }
+            else
+            {
+                // Long form
+                var temp = length;
+                var bytesRequired = 0;
+                while (temp > 0)
+                {
+                    temp >>= 8;
+                    bytesRequired++;
+                }
+                stream.Write((byte)(bytesRequired | 0x80));
+                for (var i = bytesRequired - 1; i >= 0; i--)
+                {
+                    stream.Write((byte)(length >> (8 * i) & 0xff));
+                }
+            }
+        }
+        public static void EncodeIntegerBigEndian(BinaryWriter stream, byte[] value, bool forceUnsigned = true)
+        {
+            stream.Write((byte)0x02); // INTEGER
+            var prefixZeros = 0;
+            for (var i = 0; i < value.Length; i++)
+            {
+                if (value[i] != 0) break;
+                prefixZeros++;
+            }
+
+            if (value.Length - prefixZeros == 0)
+            {
+                EncodeLength(stream, 1);
+                stream.Write((byte)0);
+            }
+            else
+            {
+                if (forceUnsigned && value[prefixZeros] > 0x7f)
+                {
+                    // Add a prefix zero to force unsigned if the MSB is 1
+                    EncodeLength(stream, value.Length - prefixZeros + 1);
+                    stream.Write((byte)0);
+                }
+                else
+                {
+                    EncodeLength(stream, value.Length - prefixZeros);
+                }
+
+                for (var i = prefixZeros; i < value.Length; i++)
+                {
+                    stream.Write(value[i]);
+                }
+            }
+        }
+
+        public static byte[] trimByte(byte[] input)
+        {
+
+            int byteCounter = input.Length - 1;
+            while (input[byteCounter] == 0x00)
+            {
+                byteCounter--;
+            }
+            byte[] rv = new byte[(byteCounter + 1)];
+            for (int byteCounter1 = 0; byteCounter1 < (byteCounter + 1); byteCounter1++)
+            {
+                rv[byteCounter1] = input[byteCounter1];
+            }
+            return rv;
+        }
+
+        public static BigInteger OS2IP(byte[] data, bool isLittleEndian)
+        {
+            BigInteger bi = 0;
+            if (isLittleEndian)
+            {
+                for (int i = 0; i < data.Length; i++)
+                {
+                    bi += BigInteger.Pow(256, i) * (long)data[i];
+                }
+            }
+            else
+            {
+                for (int i = 1; i <= data.Length; i++)
+                {
+                    bi += BigInteger.Pow(256, i - 1) * (long)data[data.Length - i];
+                }
+            }
+            return bi;
+        }
+
         public static byte[] ConvertHexStringToByteArray(string hexString)
         {
             if (hexString.Length % 2 != 0)
             {
-                throw new ArgumentException(String.Format("The binary key cannot have an odd number of digits: {0}", hexString));
+                //throw new ArgumentException(String.Format("The binary key cannot have an odd number of digits: {0}", hexString));
+                hexString = "0" + hexString;
             }
 
             byte[] HexAsBytes = new byte[hexString.Length / 2];
@@ -431,5 +528,15 @@ namespace SharpDPAPI
             }
             return -1;
         }
+
+        public static string ByteArrayToString(byte[] ba)
+        {
+            StringBuilder hex = new StringBuilder(ba.Length * 2);
+            foreach (byte b in ba)
+                hex.AppendFormat("{0:x2}", b);
+            return hex.ToString();
+        }
+
+
     }
 }

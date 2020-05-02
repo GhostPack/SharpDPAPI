@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using System.Runtime.InteropServices;
 using System.ComponentModel;
+using System.IO;
 
 namespace SharpDPAPI
 {
@@ -36,6 +37,7 @@ namespace SharpDPAPI
 
             return System.BitConverter.ToString(output).Replace("-", "");
         }
+        
         public static byte[] DecryptBlob(byte[] ciphertext, byte[] key, int algCrypt = 26115, PaddingMode padding = PaddingMode.Zeros)
         {
             // decrypts a DPAPI blob using 3DES or AES
@@ -55,10 +57,18 @@ namespace SharpDPAPI
                 desCryptoProvider.IV = ivBytes;
                 desCryptoProvider.Mode = CipherMode.CBC;
                 desCryptoProvider.Padding = padding;
+                try
+                {
+                    byte[] plaintextBytes = desCryptoProvider.CreateDecryptor()
+                        .TransformFinalBlock(ciphertext, 0, ciphertext.Length);
+                    return plaintextBytes;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("[x] An exception occured: {0}", e);
+                }
 
-                byte[] plaintextBytes = desCryptoProvider.CreateDecryptor().TransformFinalBlock(ciphertext, 0, ciphertext.Length);
-
-                return plaintextBytes;
+                return new byte[0];
             }
             else if (algCrypt == 26128)
             {
@@ -133,6 +143,47 @@ namespace SharpDPAPI
             {
                 return new byte[0];
             }
+        }
+        public static string ExportPrivateKey(RSACryptoServiceProvider csp)
+        {
+            //https://stackoverflow.com/questions/23734792/c-sharp-export-private-public-rsa-key-from-rsacryptoserviceprovider-to-pem-strin
+            StringWriter outputStream = new StringWriter();
+            if (csp.PublicOnly) throw new ArgumentException("CSP does not contain a private key", "csp");
+            var parameters = csp.ExportParameters(true);
+            using (var stream = new MemoryStream())
+            {
+                var writer = new BinaryWriter(stream);
+                writer.Write((byte)0x30); // Sequence
+                using (var innerStream = new MemoryStream())
+                {
+                    var innerWriter = new BinaryWriter(innerStream);
+                    Helpers.EncodeIntegerBigEndian(innerWriter, new byte[] { 0x00 }); // Version
+                    Helpers.EncodeIntegerBigEndian(innerWriter, parameters.Modulus);
+                    Helpers.EncodeIntegerBigEndian(innerWriter, parameters.Exponent);
+                    Helpers.EncodeIntegerBigEndian(innerWriter, parameters.D);
+                    Helpers.EncodeIntegerBigEndian(innerWriter, parameters.P);
+                    Helpers.EncodeIntegerBigEndian(innerWriter, parameters.Q);
+                    Helpers.EncodeIntegerBigEndian(innerWriter, parameters.DP);
+                    Helpers.EncodeIntegerBigEndian(innerWriter, parameters.DQ);
+                    Helpers.EncodeIntegerBigEndian(innerWriter, parameters.InverseQ);
+                    var length = (int)innerStream.Length;
+                    Helpers.EncodeLength(writer, length);
+                    writer.Write(innerStream.GetBuffer(), 0, length);
+                }
+
+                var base64 = Convert.ToBase64String(stream.GetBuffer(), 0, (int)stream.Length).ToCharArray();
+
+                outputStream.Write("-----BEGIN RSA PRIVATE KEY-----\n");
+
+                for (var i = 0; i < base64.Length; i += 64)
+                {
+                    outputStream.Write(base64, i, Math.Min(64, base64.Length - i));
+                    outputStream.Write("\n");
+                }
+                outputStream.Write("-----END RSA PRIVATE KEY-----");
+            }
+
+            return outputStream.ToString();
         }
 
         public static byte[] AESDecrypt(byte[] key, byte[] IV, byte[] data)

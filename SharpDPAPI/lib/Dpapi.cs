@@ -4,12 +4,394 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace SharpDPAPI
 {
     public class Dpapi
     {
+        public static byte[] DescribeDPAPICertBlob(byte[] blobBytes, Dictionary<string, string> MasterKeys)
+        {
+            //Based heavily on dpapick from @jmichel_p https://bitbucket.org/jmichel/dpapick/
+
+            var offset = 0;
+            var version = BitConverter.ToUInt32(blobBytes, offset);
+
+            offset += 8; //consuming a null byte
+            var descrLen = BitConverter.ToUInt32(blobBytes, offset);
+
+            offset += 4;
+            var sigheadlen = BitConverter.ToUInt32(blobBytes, offset);
+            var sigprivkeylen = BitConverter.ToUInt32(blobBytes, offset);
+
+            offset += 8;
+            var headerlen = BitConverter.ToUInt32(blobBytes, offset);
+
+            offset += 4;
+            var privkeylen = BitConverter.ToUInt32(blobBytes, offset);
+
+            offset += 4;
+            var crcLen = BitConverter.ToUInt32(blobBytes, offset);
+
+            offset += 4;
+            var sigflagslen = BitConverter.ToUInt32(blobBytes, offset);
+
+            offset += 4;
+            var flagslen = BitConverter.ToUInt32(blobBytes, offset);
+
+            offset += 4;
+
+
+            var descriptionGUID = new byte[descrLen];
+            Array.Copy(blobBytes, offset, descriptionGUID, 0, descrLen);
+            var guidString = Encoding.UTF8.GetString(descriptionGUID, 0, descriptionGUID.Length);
+            Console.WriteLine("    Private Key GUID    : {0}", guidString);
+
+            offset += descriptionGUID.Length;
+            var crc = new byte[crcLen];
+            Array.Copy(blobBytes, offset, crc, 0, crcLen);
+            var crcStr = Helpers.ByteArrayToString(crc);
+            offset += (int) crcLen;
+
+
+            if (sigheadlen > 0 || sigprivkeylen > 0 || sigflagslen > 0 || flagslen > 0 && privkeylen == 0)
+                Console.WriteLine("\r\n[*] Not implemented yet");
+
+            if (headerlen > 0)
+            {
+                var magicStr = Encoding.UTF8.GetString(blobBytes, offset, 4);
+                Console.WriteLine("    Magic Header: {0}", magicStr);
+                offset += 4;
+                var len1 = BitConverter.ToUInt32(blobBytes, offset);
+                Console.WriteLine("    Len1: {0}", len1);
+                offset += 4;
+                var bitlength = BitConverter.ToUInt32(blobBytes, offset);
+                Console.WriteLine("    Bitlength: {0}", bitlength); //0x400
+                offset += 4;
+                var unk = BitConverter.ToUInt32(blobBytes, offset);
+                Console.WriteLine("    UNK: {0}", unk); // 0x7F
+                offset += 4;
+                var pubexp = BitConverter.ToUInt32(blobBytes, offset);
+                Console.WriteLine("    Pubexp: {0}", pubexp); // 0x00010001
+                offset += 4;
+                var data = new byte[bitlength / 8];
+                Array.Copy(blobBytes, offset, data, 0,
+                    bitlength / 8); //TODO
+
+                offset += (int) bitlength / 8 + 8;
+            }
+
+            if (privkeylen > 0)
+            {
+                var offset2 = 0;
+                var dpapiblob = new byte[privkeylen];
+                Array.Copy(blobBytes, offset, dpapiblob, 0, privkeylen);
+
+                var dpapiversion = BitConverter.ToUInt32(dpapiblob, offset2);
+
+                offset2 += 4;
+                var provider = new byte[16];
+                Array.Copy(dpapiblob, offset2, provider, 0, 16);
+                var guidProvider = new Guid(provider);
+                var strGuidProvider = string.Format("{{{0}}}", guidProvider);
+                Console.WriteLine("    GuidProvider GUID is {0}", strGuidProvider);
+
+                offset2 += provider.Length;
+                var blobStart = offset2;
+                var mkversion = BitConverter.ToUInt32(dpapiblob, offset2);
+
+                offset2 += 4;
+                var mkguid = new byte[16];
+                Array.Copy(dpapiblob, offset2, mkguid, 0, 16);
+                var mkguidProvider = new Guid(mkguid);
+                var strmkguidProvider = string.Format("{{{0}}}", mkguidProvider);
+                Console.WriteLine("    Master Key GUID is {0}", strmkguidProvider);
+
+                offset2 += 16;
+                var mkflags = BitConverter.ToUInt32(dpapiblob, offset2);
+
+
+                offset2 += 4;
+                var descrlen = BitConverter.ToInt32(dpapiblob, offset2);
+
+                offset2 += 4;
+                var description = Encoding.Unicode.GetString(dpapiblob, offset2, descrlen);
+                Console.WriteLine("    Description: {0}", description);
+
+                offset2 += descrlen;
+                var algCrypt = BitConverter.ToInt32(dpapiblob, offset2);
+                Console.WriteLine("    algCrypt: {0}", (Interop.CryptAlg) algCrypt);
+
+                offset2 += 4;
+                var algCryptLen = BitConverter.ToInt32(dpapiblob, offset2);
+                Console.WriteLine("    keyLen: {0}", algCryptLen);
+
+                offset2 += 4;
+                var saltBytes = new byte[BitConverter.ToUInt32(dpapiblob, offset2)];
+                Array.Copy(dpapiblob, offset2 + 4, saltBytes, 0, BitConverter.ToUInt32(dpapiblob, offset2));
+                Console.WriteLine("    Salt: {0}", Helpers.ByteArrayToString(saltBytes));
+
+                offset2 += saltBytes.Length + 8; //skipped strong structure
+                var algHash = BitConverter.ToInt32(dpapiblob, offset2);
+                Console.WriteLine("    algHash: {0}", (Interop.CryptAlg) algHash); // 0e800000 sha512
+
+                offset2 += 4;
+                var hashlen = BitConverter.ToInt32(dpapiblob, offset2);
+                Console.WriteLine("    Hashlen: {0}", hashlen);
+
+                offset2 += 4;
+                var hmac = new byte[BitConverter.ToUInt32(dpapiblob, offset2)];
+                Array.Copy(dpapiblob, offset2 + 4, hmac, 0, BitConverter.ToUInt32(dpapiblob, offset2));
+                Console.WriteLine("    HMAC: {0}",
+                    Helpers.ByteArrayToString(hmac)); 
+
+                offset2 += hmac.Length + 4;
+                var cipherText = new byte[BitConverter.ToUInt32(dpapiblob, offset2)];
+                Array.Copy(dpapiblob, offset2 + 4, cipherText, 0, BitConverter.ToUInt32(dpapiblob, offset2));
+
+
+                offset2 += cipherText.Length + 4;
+                var selfblobBytes = new byte[offset2 - blobStart];
+                Array.Copy(dpapiblob, blobStart, selfblobBytes, 0, offset2 - blobStart);
+
+
+                var signBytes = new byte[BitConverter.ToUInt32(dpapiblob, offset2)];
+                Array.Copy(dpapiblob, offset2 + 4, signBytes, 0, BitConverter.ToUInt32(dpapiblob, offset2));
+
+
+                offset2 += signBytes.Length + 4;
+
+
+                if (MasterKeys.ContainsKey(strmkguidProvider)) // if this key is present, decrypt this blob
+                {
+                    if (algHash == 32782)
+                        try
+                        {
+                            var keyBytes = Helpers.StringToByteArray(MasterKeys[strmkguidProvider]);
+
+                            // derive the session key
+                            var derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash);
+                            var finalKeyBytes = new byte[algCryptLen / 8];
+                            Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
+                            return Crypto.DecryptBlob(cipherText, finalKeyBytes, algCrypt);
+                        }
+                        catch
+                        {
+                            Console.WriteLine("    [X] Error retrieving GUID:SHA1 from cache {0}", strmkguidProvider);
+                        }
+                    else if (algHash == 32772) // 32772 == CALG_SHA1
+                        try
+                        {
+                            algCryptLen = 192; //3DES rounding
+
+                            var keyBytes = Helpers.StringToByteArray(MasterKeys[strmkguidProvider]);
+
+                            // derive the session key
+                            var derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash);
+
+
+                            var finalKeyBytes = new byte[algCryptLen / 8];
+                            Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
+
+                            // decrypt the blob with the session key
+                            try
+                            {
+                                return Crypto.DecryptBlob(cipherText, finalKeyBytes, algCrypt);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine("    [X] Error decrypting blob: {0}", ex);
+                            }
+                        }
+                        catch
+                        {
+                            Console.WriteLine("    [X] Error retrieving GUID:SHA1 from cache {0}", strmkguidProvider);
+                        }
+                }
+            }
+            else
+            {
+                Console.WriteLine("[*] No private key for decryption is included");
+            }
+
+            return new byte[0];
+        }
+
+        public static Tuple<string, string> DescribeCertificate(byte[] certificateBytes,
+            Dictionary<string, string> MasterKeys, bool machine = false)
+        {
+            var plaintextBytes = DescribeDPAPICertBlob(certificateBytes, MasterKeys);
+            var keypairTuple = new Tuple<string, string>("", "");
+            if (plaintextBytes.Length > 0)
+            {
+                var decryptedRSATuple = ParseDecCertBlob(plaintextBytes);
+                var PrivatePKCS1 = decryptedRSATuple.First;
+                var PrivateXML = decryptedRSATuple.Second;
+
+                X509Certificate2Collection certCollection;
+                try
+                {
+                    X509Store store;
+                    if (machine)
+                    {
+                        store = new X509Store(StoreLocation.LocalMachine);
+                        store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
+                        certCollection = store.Certificates;
+                        store.Close();
+                    }
+                    else
+                    {
+                        store = new X509Store(StoreLocation.CurrentUser);
+                        store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
+                        certCollection = store.Certificates;
+                        store.Close();
+                    }
+
+                    var found = false;
+                    
+                    foreach (var cert in certCollection)
+                    {
+                        var PublicXML = cert.PublicKey.Key.ToXmlString(false).Replace("</RSAKeyValue>", "");
+
+                        //There are cases where systems have a lot of "orphan" private keys. We are only grabbing private keys that have a matching modulus with a cert in the store
+                        //https://forums.iis.net/t/1224708.aspx?C+ProgramData+Microsoft+Crypto+RSA+MachineKeys+is+filling+my+disk+space
+                        //https://superuser.com/questions/538257/why-are-there-so-many-files-in-c-programdata-microsoft-crypto-rsa-machinekeys
+                        if (PrivateXML.Contains(PublicXML))
+                        {
+                            string b64cert = Convert.ToBase64String(cert.Export(X509ContentType.Cert));
+                            int BufferSize = 64;
+                            int Index = 0;
+                            var sb = new StringBuilder();
+                            
+                            sb.AppendLine("-----BEGIN CERTIFICATE-----");
+                            for (var i = 0; i< b64cert.Length; i+=64 )
+                            {
+                                sb.AppendLine(b64cert.Substring(i, Math.Min(64, b64cert.Length-i)));
+                                Index += BufferSize;
+                            }
+                            sb.AppendLine("-----END CERTIFICATE-----");
+                            keypairTuple = new Tuple<string, string>(PrivatePKCS1, sb.ToString());
+                            found = true;
+							// Commented code for pfx generation due to MS not giving 
+							//a dispose method < .NET4.6 https://snede.net/the-most-dangerous-constructor-in-net/
+                            //   X509Certificate2 certificate = new X509Certificate2(cert.RawData);
+                            //   certificate.PrivateKey = ;
+                            //       string filename = string.Format("{0}.pfx", cert.Thumbprint);
+                            //      File.WriteAllBytes(filename, certificate.Export(X509ContentType.Pkcs12, (string)null));
+                            //        certificate.Reset();  
+                            //        certificate = null;
+                            store.Close();
+                            store = null;
+
+                            break;
+                        }
+                    }
+                    certCollection.Clear();
+                    
+
+                    if (store != null)
+                    {
+                        store.Close();
+                        store = null;
+                    }
+
+                    //if (!found) base64 = new Tuple<string, string>(Crypto.ExportPrivateKey(rsa), "");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("\r\n[X] An exception occurred {0}", ex.Message);
+                }
+            }
+
+            return keypairTuple;
+        }
+
+        public static Tuple<string, string> ParseDecCertBlob(byte[] decBlobBytes)
+        {
+            //https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-wcce/5cf2e6b9-3195-4f85-bc18-05b50e6d4e11?redirectedfrom=MSDN
+            //http://www.turing321.com/hex_edit/hexprobe/binary_file.htm#Parse_Blobs
+            //http://www.programmersought.com/article/9153121802/
+            //https://docs.microsoft.com/en-us/windows/win32/seccrypto/base-provider-key-blobs?redirectedfrom=MSDN#public-key-blobs
+            //https://www.sysadmins.lv/blog-en/how-to-convert-pem-to-x509certificate2-in-powershell-revisited.aspx
+            //https://etherhack.co.uk/asymmetric/docs/rsa_key_breakdown.html
+            //https://www.passcape.com/index.php?section=docsys&cmd=details&id=28
+
+            var offset = 0;
+            var magic = Encoding.UTF8.GetString(decBlobBytes, offset, 4);
+
+            offset += 4;
+            var len1 = BitConverter.ToInt32(decBlobBytes, offset);
+
+            offset += 4;
+            var bitlen = BitConverter.ToInt32(decBlobBytes, offset);
+            var chunk = bitlen / 16;
+
+            offset += 4;
+            var unk = BitConverter.ToInt32(decBlobBytes, offset);
+
+            offset += 4;
+            var pubexp = new byte[4];
+            Array.Copy(decBlobBytes, offset, pubexp, 0, 4);
+
+            offset += 4;
+            var modulus = new byte[chunk * 2];
+            Array.Copy(decBlobBytes, offset, modulus, 0, chunk * 2);
+
+            offset += len1;
+            var prime1 = new byte[chunk];
+            Array.Copy(decBlobBytes, offset, prime1, 0, chunk);
+
+            offset += len1 / 2;
+            var prime2 = new byte[chunk];
+            Array.Copy(decBlobBytes, offset, prime2, 0, chunk);
+
+            offset += len1 / 2;
+            var exponent1 = new byte[chunk];
+            Array.Copy(decBlobBytes, offset, exponent1, 0, chunk);
+
+            offset += len1 / 2;
+            var exponent2 = new byte[chunk];
+            Array.Copy(decBlobBytes, offset, exponent2, 0, chunk);
+
+            offset += len1 / 2;
+            var coefficient = new byte[chunk];
+            Array.Copy(decBlobBytes, offset, coefficient, 0, chunk);
+
+            offset += len1 / 2;
+            var privExponent = new byte[chunk * 2];
+            Array.Copy(decBlobBytes, offset, privExponent, 0, chunk * 2);
+            offset += len1;
+
+            //http://blog.majcica.com/2011/12/03/certificates-to-db-and-back-part-2/
+            //CspParameters parms = new CspParameters();
+            //parms.Flags = CspProviderFlags.NoFlags;
+            //parms.KeyContainerName = Guid.NewGuid().ToString().ToUpperInvariant();
+            //parms.ProviderType = ((Environment.OSVersion.Version.Major > 5) || ((Environment.OSVersion.Version.Major == 5) && (Environment.OSVersion.Version.Minor >= 1))) ? 0x18 : 1;
+            //RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(parms);
+
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider())
+            {
+                RSAParameters RSAKeyInfo = new RSAParameters();
+                string tmpStr = Helpers.OS2IP(modulus, false).ToHexString();
+                int len = tmpStr.Length;
+
+                
+                RSAKeyInfo.Modulus = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(modulus, true).ToHexString());
+                RSAKeyInfo.Exponent = Helpers.trimByte(Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(pubexp, true).ToHexString()));
+                RSAKeyInfo.D = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(privExponent, true).ToHexString());
+                RSAKeyInfo.P = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(prime1, true).ToHexString());
+                RSAKeyInfo.Q = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(prime2, true).ToHexString());
+                RSAKeyInfo.DP = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(exponent1, true).ToHexString());
+                RSAKeyInfo.DQ = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(exponent2, true).ToHexString());
+                RSAKeyInfo.InverseQ = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(coefficient, true).ToHexString());
+                rsa.ImportParameters(RSAKeyInfo);
+               
+                Tuple<string, string> privateKeyb64 = new Tuple<string, string>(Crypto.ExportPrivateKey(rsa), rsa.ToXmlString(true));
+                return privateKeyb64;
+            }
+        }
+
         public static Dictionary<string, string> PVKTriage(Dictionary<string, string> arguments)
         {
             // used by command functions to take a /pvk:X backupkey and use it to decrypt user masterkeys
@@ -1192,7 +1574,7 @@ namespace SharpDPAPI
                         }
                     }
                 }// Added support for 32777(CALG_HMAC) / 26115(CALG_3DES)
-                else if ((algCrypt == 26115) && (algHash == 32777))
+                 else if ((algCrypt == 26115) && (algHash == 32777 || algHash == 32772))
                 {
                     TripleDESCryptoServiceProvider desCryptoProvider = new TripleDESCryptoServiceProvider();
 

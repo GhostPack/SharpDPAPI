@@ -29,6 +29,8 @@ namespace SharpDPAPI.Domain
             _availableCommands.Add(RDG.CommandName, () => new RDG());
             _availableCommands.Add(UserTriage.CommandName, () => new UserTriage());
             _availableCommands.Add(Vaults.CommandName, () => new Vaults());
+            _availableCommands.Add(Certificate.CommandName, () => new Certificate());
+            _availableCommands.Add(MachineCertificates.CommandName, () => new MachineCertificates());
         }
 
         public bool ExecuteCommand(string commandName, Dictionary<string, string> arguments)
