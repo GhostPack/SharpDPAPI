@@ -117,6 +117,23 @@ namespace SharpDPAPI
                 }
             }
 
+            if (!String.IsNullOrEmpty(password))
+            {
+                if (mappings.Count == 0)
+                {
+                    Console.WriteLine("\n[!] No master keys decrypted!\r\n");
+                }
+                else
+                {
+                    Console.WriteLine("\n[*] User master key cache:\r\n");
+                    foreach (KeyValuePair<string, string> kvp in mappings)
+                    {
+                        Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
+                    }
+                    Console.WriteLine();
+                }
+            }
+
             Console.WriteLine();
             return mappings;
         }

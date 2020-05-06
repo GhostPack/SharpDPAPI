@@ -27,6 +27,7 @@ Machine/SYSTEM Triage:
     machinemasterkeys       -   triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret)
     machinecredentials      -   use 'machinemasterkeys' and then triage machine Credential files
     machinevaults           -   use 'machinemasterkeys' and then triage machine Vaults
+    machinecerts           -   use 'machinemasterkeys' and then triage machine certificate stores
     machinetriage           -   run the 'machinecredentials' and 'machinevaults' commands
 
 
@@ -37,7 +38,7 @@ User Triage:
       SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>    
 
 
-    Arguments for the credentials|vaults|rdg|triage|blob|ps commands:
+    Arguments for the certificates|credentials|vaults|rdg|triage|blob|ps commands:
 
         Decryption:
             /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands

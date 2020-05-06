@@ -34,11 +34,13 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       - [credentials](#credentials)
       - [vaults](#vaults)
       - [rdg](#rdg)
+      - [certificates](#certificates)
       - [triage](#triage)
     + [Machine Triage](#machine-triage)
       - [machinemasterkeys](#machinemasterkeys)
       - [machinecredentials](#machinecredentials)
       - [machinevaults](#machinevaults)
+      - [machinecerts](#machinecerts)
       - [machinetriage](#machinetriage)
     + [Misc](#misc)
       - [ps](#ps)
@@ -61,7 +63,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
-      v1.6.1
+      v1.7.0
 
 
 
@@ -75,6 +77,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
         machinemasterkeys       -   triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret)
         machinecredentials      -   use 'machinemasterkeys' and then triage machine Credential files
         machinevaults           -   use 'machinemasterkeys' and then triage machine Vaults
+        machinecerts           -   use 'machinemasterkeys' and then triage machine certificate stores
         machinetriage           -   run the 'machinecredentials' and 'machinevaults' commands
 
 
@@ -85,7 +88,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
           SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>
 
 
-        Arguments for the credentials|vaults|rdg|triage|blob|ps commands:
+        Arguments for the certificates|credentials|vaults|rdg|triage|blob|ps commands:
 
             Decryption:
                 /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
@@ -170,7 +173,7 @@ For more offensive DPAPI information, [check here](https://www.harmj0y.net/blog/
 
 SharpChrome is a Chrome-specific implementation of SharpDPAPI capable of **cookies** and **logins** decryption/triage. It is built as a separate project in SharpDPAPI because of the size of the SQLite library utilized.
 
-Since Chrome Cookies/Login Data are saved without CRYPTPROTECT_SYSTEM, CryptUnprotectData() is back on the table. If SharpChrome is run from an unelevated contect, it will attempt to decrypt any logins/cookies for the current user using CryptUnprotectData(). A `/pvk:[BASE64|file.pvk]`, {GUID}:SHA1 lookup table, or `/mkfile:FILE` of {GUID}:SHA1 values can also be used to decrypt values. Also, the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) used (with a few modifications) supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199), meaning that Chrome does not have to be closed/target files do not have to be copied to another location.
+Since Chrome Cookies/Login Data are saved without CRYPTPROTECT_SYSTEM, CryptUnprotectData() is back on the table. If SharpChrome is run from an unelevated contect, it will attempt to decrypt any logins/cookies for the current user using CryptUnprotectData(). A `/pvk:[BASE64|file.pvk]`, {GUID}:SHA1 lookup table, `/password:X`, or `/mkfile:FILE` of {GUID}:SHA1 values can also be used to decrypt values. Also, the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) used (with a few modifications) supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199), meaning that Chrome does not have to be closed/target files do not have to be copied to another location.
 
 If Chrome is version 80+, an AES state key is stored in *AppData\Local\Google\Chrome\User Data\Local State* - this key is protected with DPAPI, so we can use CryptUnprotectData()/pvk/masterkey lookup tables to decrypt it. This AES key is then used to protect new cookie and login data entries.
 
@@ -221,7 +224,7 @@ The domain backup key can be in base64 form (`/pvk:BASE64...`) or file form (`/p
 
 #### credentials
 
-The **credentials** command will search for Credential files and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+The **credentials** command will search for Credential files and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 A specific credential file (or folder of credentials) can be specified with `/target:FILE` or `/target:C:\Folder\`. If a file is specified, {GUID}:SHA1 values are required, and if a folder is specified either a) {GUID}:SHA1 values must be supplied or b) the folder must contain DPAPI masterkeys and a /pvk domain backup key must be supplied.
 
@@ -309,7 +312,7 @@ Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
 
 #### vaults
 
-The **vaults** command will search for Vaults and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+The **vaults** command will search for Vaults and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 The Policy.vpol folder in the Vault folder is decrypted with any supplied DPAPI keys to retrieve the associated AES decryption keys, which are then used to decrypt any associated .vcrd files.
 
@@ -438,7 +441,7 @@ Using a domain DPAPI backup key with a folder specified (i.e. "offline" triage):
 
 #### rdg
 
-The **rdg** command will search for RDCMan.settings files for the current user (or if elevated, all users) and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+The **rdg** command will search for RDCMan.settings files for the current user (or if elevated, all users) and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), or d) a `/password:X` to decrypt any user masterkeys which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 The `/unprotect` flag will use CryptUnprotectData() to decrypt any saved RDP passwords, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
 
@@ -589,9 +592,112 @@ Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
                 Password   : Password123!
 
 
+#### certificates
+
+The **certificates** command will search user encrypted DPAPI certificate private keys a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+
+A specific certificiate can be specified with `/target:C:\Folder\`. In this case, either a) {GUID}:SHA1 values must be supplied or b) the folder must contain DPAPI masterkeys and a /pvk domain backup key must be supplied.
+
+Using domain {GUID}:SHA1 masterkey mappings:
+
+    C:\Temp>SharpDPAPI.exe certificates {2fd105b7-ec31-4f33-969e-f57c16d8e718}:79097C8...
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.7.0
+
+
+    [*] Action: Cert Triage
+
+    Certificate file           : 824020b98d4a03d0d23392fb673067eb_6c712ef3-1467-4f96-bb5c-6737ba66cfb0
+
+        Private Key GUID    : {DEB1D7E1-DA7B-4C99-A8F1-F1A532B4BA0E}
+        Magic Header: RSA1
+        Len1: 264
+        Bitlength: 2048
+        UNK: 255
+        Pubexp: 65537
+        GuidProvider GUID is {df9d8cd0-1501-11d1-8c7a-00c04fc297eb}
+        Master Key GUID is {2fd105b7-ec31-4f33-969e-f57c16d8e718}
+        Description: CryptoAPI Private Key
+        algCrypt: CALG_3DES
+        keyLen: 192
+        Salt: d58a77d4b817a366a179b1eaa5b9f797
+        algHash: CALG_SHA
+        Hashlen: 160
+        HMAC: e4fa2d8144af651a86de20efa5771d20
+
+    [*] Private key file 824020b98d4a03d0d23392fb673067eb_6c712ef3-1467-4f96-bb5c-6737ba66cfb0 was recovered
+
+    [*] PKCS1 Private key
+
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIEpAIBAAKCAQEAtt/LpUFCjeE2YBmwvhkAI2R8DfX...(snip)...
+    -----END RSA PRIVATE KEY-----
+
+    [*] Certificate
+
+    -----BEGIN CERTIFICATE-----
+    MIIC1jCCAb6gAwIBAgIQfSNOUmInprRC0lEVt7u...(snip)...
+    -----END CERTIFICATE-----
+
+
+Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
+
+    C:\Temp>SharpDPAPI.exe certificates /pvk:HvG1sAAAAAABAAAAAAAAAAAAAAC...(snip)...
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.7.0
+
+
+    [*] Action: Cert Triage
+    [*] Using a domain DPAPI backup key to triage masterkeys for decryption key mappings!
+
+    [*] User master key cache:
+
+    {2fd105b7-ec31-4f33-969e-f57c16d8e718}:79097C8...
+    ...(snip)...
+
+    Certificate file           : 824020b98d4a03d0d23392fb673067eb_6c712ef3-1467-4f96-bb5c-6737ba66cfb0
+
+        Private Key GUID    : {DEB1D7E1-DA7B-4C99-A8F1-F1A532B4BA0E}
+        Magic Header: RSA1
+        Len1: 264
+        Bitlength: 2048
+        UNK: 255
+        Pubexp: 65537
+        GuidProvider GUID is {df9d8cd0-1501-11d1-8c7a-00c04fc297eb}
+        Master Key GUID is {2fd105b7-ec31-4f33-969e-f57c16d8e718}
+        Description: CryptoAPI Private Key
+        algCrypt: CALG_3DES
+        keyLen: 192
+        Salt: d58a77d4b817a366a179b1eaa5b9f797
+        algHash: CALG_SHA
+        Hashlen: 160
+        HMAC: e4fa2d8144af651a86de20efa5771d20
+
+    [*] Private key file 824020b98d4a03d0d23392fb673067eb_6c712ef3-1467-4f96-bb5c-6737ba66cfb0 was recovered
+
+    [*] PKCS1 Private key
+
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIEpAIBAAKCAQEAtt/LpUFCjeE2YBmwvhkAI2R8DfX...(snip)...
+    -----END RSA PRIVATE KEY-----
+
+    [*] Certificate
+
+    -----BEGIN CERTIFICATE-----
+    MIIC1jCCAb6gAwIBAgIQfSNOUmInprRC0lEVt7u...(snip)...
+    -----END CERTIFICATE-----
+
+
 #### triage
 
-The **triage** command runs the user [credentials](#credentials), [vaults](#vaults), and [rdg](#rdg) triage commands.
+The **triage** command runs the user [credentials](#credentials), [vaults](#vaults), [rdg](#rdg), and [certificates](#certificates) commands.
 
 
 ### Machine Triage
@@ -734,9 +840,79 @@ Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA 
     ...(snip)...
 
 
+#### machinecerts
+
+The **machinecerts** command will elevated to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret which is then used to decrypt any found machine DPAPI masterkeys. These keys are then used to decrypt any found machine system encrypted DPAPI private certificate keys.
+
+Local administrative rights are needed (so we can retrieve the DPAPI_SYSTEM LSA secret).
+
+    C:\Temp>SharpDPAPI.exe machinecerts
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.7.0
+
+
+    [*] Action: Machine DPAPI Certificate Triage
+
+    [*] Elevating to SYSTEM via token duplication for LSA secret retrieval
+    [*] RevertToSelf()
+
+
+    [*] Secret  : DPAPI_SYSTEM
+    [*]    full: DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
+    [*]    m/u : DBA60EB802B6C4B42E1E450BB5781EBD0846E1BF / 6C88CEFD23D0291FA9FE46899D4DE12A180E76C3
+
+    [*] SYSTEM master key cache:
+
+    {3c1fb9fb-aabe-4c45-aab9-c3e1b614776d}:4E4193B4C4D2F0420E0656B5F83D03754B565A0C
+    ...(snip)...
+
+
+    [*] Triaging System Certificates
+
+
+    Folder       : C:\ProgramData\Microsoft\Crypto\RSA\MachineKeys
+
+
+    Certificate file           : fad662b360941f26a1193357aab3c12d_6c712ef3-1467-4f96-bb5c-6737ba66cfb0
+
+        Private Key GUID    : IIS Express Development Certificate Container
+        Magic Header: RSA1
+        Len1: 264
+        Bitlength: 2048
+        UNK: 255
+        Pubexp: 65537
+        GuidProvider GUID is {df9d8cd0-1501-11d1-8c7a-00c04fc297eb}
+        Master Key GUID is {3c1fb9fb-aabe-4c45-aab9-c3e1b614776d}
+        Description: CryptoAPI Private Key
+        algCrypt: CALG_AES_256
+        keyLen: 256
+        Salt: daa3d225ba280029a6169495bbdb3182c75f659ffcd1352ee845e830621fbc08
+        algHash: CALG_SHA_512
+        Hashlen: 512
+        HMAC: 93519cb9b6bbdf409909b3ee78dc1d783ab5db273bf796d9f9f77ea8ba2f64b3
+
+    [*] Private key file fad662b360941f26a1193357aab3c12d_6c712ef3-1467-4f96-bb5c-6737ba66cfb0 was recovered
+
+    [*] PKCS1 Private key
+
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIEogIBAAKCAQEApSg1h2MH3lK39ZoFrj1tz5...(snip)...
+    -----END RSA PRIVATE KEY-----
+
+    [*] Certificate
+
+    -----BEGIN CERTIFICATE-----
+    MIIC1jCCAb6gAwIBAgIQfSNOUmInprRC0lEVt7u...(snip)...
+    -----END CERTIFICATE-----
+    
+
 #### machinetriage
 
-The **machinetriage** command runs the user [machinecredentials](#machinecredentials) and [machinevaults](#machinevaults) triage commands.
+The **machinetriage** command runs the user [machinecredentials](#machinecredentials), [machinevaults](#machinevaults), and [machinecerts](#machinecerts) commands.
 
 
 ### Misc
@@ -745,7 +921,7 @@ The **machinetriage** command runs the user [machinecredentials](#machinecredent
 
 The **ps** command will describe/decrypt an exported PSCredential clixml. A `/target:FILE.xml` *must* be supplied.
 
-The command will a) decrypt the file with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+The command will a) decrypt the file with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 The `/unprotect` flag will use CryptUnprotectData() to decrypt the credenial .xml without masterkeys needed, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
 
@@ -846,7 +1022,7 @@ Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
 
 The **blob** command will describe/decrypt a DPAPI blob. A `/target:<BASE64|blob.bin>` *must* be supplied.
 
-The command will a) decrypt the blob with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+The command will a) decrypt the blob with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 The `/unprotect` flag will use CryptUnprotectData() to decrypt the blob without masterkeys needed, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
 
@@ -980,7 +1156,7 @@ Retrieve the DPAPI backup key for the specified DC, outputting the backup key to
 
 The **logins** command will search for Chrome 'Login Data' files and decrypt the saved login passwords. If execution is in an unelevated contect, CryptProtectData() will automatically be used to try to decrypt values.
 
-Login Data files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+Login Data files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 A specific Login Data file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` is also supplied.
 
@@ -992,7 +1168,7 @@ If run from an elevated context, Login Data files for ALL users will be triaged,
 
 The **cookies** command will search for Chrome 'Cookies' files and decrypt cookie values. If execution is in an unelevated contect, CryptProtectData() will automatically be used to try to decrypt values.
 
-Cookie files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, or c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys which are then used as a lookup deryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+Cookie files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
 A specific Cookies file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` is also supplied.
 

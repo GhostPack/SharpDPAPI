@@ -62,8 +62,10 @@
   <ItemGroup>
     <Compile Include="Commands\Backupkey.cs" />
     <Compile Include="Commands\Blob.cs" />
+    <Compile Include="Commands\Certificate.cs" />
     <Compile Include="Commands\Credentials.cs" />
     <Compile Include="Commands\ICommand.cs" />
+    <Compile Include="Commands\MachineCertificates.cs" />
     <Compile Include="Commands\Masterkeys.cs" />
     <Compile Include="Commands\Machinecredentials.cs" />
     <Compile Include="Commands\Machinemasterkeys.cs" />
@@ -79,6 +81,7 @@
     <Compile Include="Domain\Info.cs" />
     <Compile Include="Domain\Version.cs" />
     <Compile Include="lib\Backup.cs" />
+    <Compile Include="lib\BigInteger.cs" />
     <Compile Include="lib\Crypto.cs" />
     <Compile Include="lib\Dpapi.cs" />
     <Compile Include="lib\Helpers.cs" />
@@ -86,6 +89,7 @@
     <Compile Include="lib\LSADump.cs" />
     <Compile Include="lib\PBKDF2.cs" />
     <Compile Include="lib\Triage.cs" />
+    <Compile Include="lib\Tuple.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

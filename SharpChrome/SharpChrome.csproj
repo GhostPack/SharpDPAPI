@@ -50,6 +50,9 @@
     <Compile Include="..\SharpDPAPI\lib\Backup.cs">
       <Link>lib\Backup.cs</Link>
     </Compile>
+    <Compile Include="..\SharpDPAPI\lib\BigInteger.cs">
+      <Link>lib\BigInteger.cs</Link>
+    </Compile>
     <Compile Include="..\SharpDPAPI\lib\Crypto.cs">
       <Link>lib\Crypto.cs</Link>
     </Compile>
@@ -70,6 +73,9 @@
     </Compile>
     <Compile Include="..\SharpDPAPI\lib\Triage.cs">
       <Link>lib\Triage.cs</Link>
+    </Compile>
+    <Compile Include="..\SharpDPAPI\lib\Tuple.cs">
+      <Link>lib\Tuple.cs</Link>
     </Compile>
     <Compile Include="Commands\Backupkey.cs" />
     <Compile Include="Commands\Cookies.cs" />

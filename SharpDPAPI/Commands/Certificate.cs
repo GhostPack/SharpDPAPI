@@ -7,7 +7,7 @@ namespace SharpDPAPI.Commands
 
     public class Certificate : ICommand
     {
-        public static string CommandName => "certificate";
+        public static string CommandName => "certificates";
 
         public void Execute(Dictionary<string, string> arguments)
         {
