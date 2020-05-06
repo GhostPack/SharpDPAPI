@@ -133,7 +133,7 @@ namespace SharpDPAPI
                 //  { machine , user }
 
                 List<byte[]> keys = LSADump.GetDPAPIKeys(true);
-
+                Helpers.GetSystem();
                 string systemFolder = String.Format("{0}\\Windows\\System32\\Microsoft\\Protect\\", Environment.GetEnvironmentVariable("SystemDrive"));
 
                 string[] systemDirs = Directory.GetDirectories(systemFolder);
@@ -150,7 +150,7 @@ namespace SharpDPAPI
 
                     foreach (string file in machineFiles)
                     {
-                        if (Regex.IsMatch(file, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
+                        if (Regex.IsMatch(file, @".*\\[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")) //Changed regex to only match files starting with the id
                         {
                             string fileName = System.IO.Path.GetFileName(file);
                             if (show)
@@ -174,7 +174,7 @@ namespace SharpDPAPI
 
                     foreach (string file in userFiles)
                     {
-                        if (Regex.IsMatch(file, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
+                        if (Regex.IsMatch(file, @".*\\[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
                         {
                             string fileName = System.IO.Path.GetFileName(file);
                             if (show)
@@ -520,6 +520,210 @@ namespace SharpDPAPI
             Console.WriteLine();
         }
 
+        public static void TriageCertFile(string certFilePath, Dictionary<string, string> MasterKeys)
+        {
+            // triage a certificate file
+            try
+            {
+                Dictionary<string, Tuple<string, string>> certDictionary = new Dictionary<string, Tuple<string, string>>();
+                string fileName = System.IO.Path.GetFileName(certFilePath);
+                Console.WriteLine("  Certificate file           : {0}\r\n", fileName);
+
+                byte[] certificateArray = File.ReadAllBytes(certFilePath);
+                try
+                {
+                    certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys));
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
+                }
+                Console.WriteLine();
+                foreach (var key in certDictionary.Keys)
+                {
+                    Console.WriteLine("{0}", certDictionary[key]);
+                    Console.WriteLine();
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("[X] Error triaging {0} : {1}", certFilePath, e.Message);
+            }
+
+            Console.WriteLine();
+        }
+
+        public static void TriageCertFolder(string folder, Dictionary<string, string> MasterKeys, bool machine = false)
+        {
+            // triage a specific certificate folder
+            Dictionary<string, Tuple<string, string>> certDictionary = new Dictionary<string, Tuple<string, string>>();
+            if (System.IO.Directory.Exists(folder))
+            {
+                string[] systemFiles = Directory.GetFiles(folder);
+                if ((systemFiles != null) && (systemFiles.Length != 0))
+                {
+                    Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
+
+                    foreach (string file in systemFiles)
+                    {
+                        if (Regex.IsMatch(file,
+                            @"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")
+                        )
+                        {
+                            string fileName = System.IO.Path.GetFileName(file);
+                            Console.WriteLine("\r\nCertificate file           : {0}\r\n", fileName);
+                            byte[] certificateArray = File.ReadAllBytes(file);
+                            try
+                            {
+                                certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys,machine));
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("\r\n[X] Folder '{0}' doesn't contain files!", folder);
+                }
+
+                Console.WriteLine();
+
+                foreach (var key in certDictionary.Keys)
+                {
+                    if (certDictionary[key].First != "")
+                    {
+                        Console.WriteLine("[*] Private key file {0} was recovered\r\n", key);
+                        Console.WriteLine("[*] PKCS1 Private key\r\n");
+                        Console.WriteLine(certDictionary[key].First);
+                        Console.WriteLine("\r\n[*] Certificate\r\n");
+                        Console.WriteLine(certDictionary[key].Second);
+                        Console.WriteLine();
+                    }
+                }
+            }
+        }
+
+        public static void TriageSystemCerts(Dictionary<string, string> MasterKeys)
+        {
+
+            if (Helpers.IsHighIntegrity())
+            {
+                Console.WriteLine("\r\n[*] Triaging System Certificates\r\n");
+
+                // all the SYSTEM Credential file locations
+                string[] folderLocations =
+                {
+                    String.Format("{0}\\ProgramData\\Microsoft\\Crypto\\RSA\\MachineKeys", Environment.GetEnvironmentVariable("SystemDrive")),
+                    String.Format("{0}\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA", Environment.GetEnvironmentVariable("SystemDrive")),
+                    String.Format("{0}\\Users\\All Users\\Application Data\\Microsoft\\Crypto\\RSA\\MachineKeys", Environment.GetEnvironmentVariable("SystemDrive"))
+                };
+
+                foreach (string location in folderLocations)
+                {
+                    TriageCertFolder(location, MasterKeys,true);
+                }
+            }
+            else
+            {
+                Console.WriteLine("\r\n[X] Must be elevated to triage SYSTEM credentials!\r\n");
+            }
+
+        }
+
+        public static void TriageUserCerts(Dictionary<string, string> MasterKeys, string computerName = "")
+        {
+
+            string[] userDirs;
+            if (!String.IsNullOrEmpty(computerName))
+            {
+                // if we're triaging a remote computer, check connectivity first
+                bool canAccess = Helpers.TestRemote(computerName);
+                if (!canAccess)
+                {
+                    return;
+                }
+            }
+
+            //TODO have not verified with multiple users
+            if (Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && Helpers.TestRemote(computerName)))
+            {
+                string userFolder = "";
+
+                if (!String.IsNullOrEmpty(computerName))
+                {
+                    userFolder = String.Format("\\\\{0}\\C$\\Users\\", computerName);
+                }
+                else
+                {
+                    userFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
+                }
+
+                userDirs = Directory.GetDirectories(userFolder);
+            }
+            else
+            {
+                // otherwise we're only triaging the current user's path
+                userDirs = new string[] { System.Environment.GetEnvironmentVariable("USERPROFILE") };
+            }
+
+            foreach (string dir in userDirs)
+            {
+                string[] parts = dir.Split('\\');
+                string userName = parts[parts.Length - 1];
+                if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") ||
+                      dir.EndsWith("All Users")))
+                {
+                    string userCertkeysBasePath = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\", dir);
+                   
+                    if (System.IO.Directory.Exists(userCertkeysBasePath))
+                    {
+                        Dictionary<string, Tuple<string, string>> certDictionary = new Dictionary<string, Tuple<string, string>>();
+                        string[] directories = Directory.GetDirectories(userCertkeysBasePath);
+                        
+                            foreach (string directory in directories)
+                            {
+                                string[] files = Directory.GetFiles(directory);
+
+                                foreach (string file in files)
+                                {
+                                    if (Regex.IsMatch(file,@"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
+                                    {
+                                        string fileName = System.IO.Path.GetFileName(file);
+                                        Console.WriteLine("\r\nCertificate file           : {0}\r\n", fileName);
+                                        byte[] certificateArray = File.ReadAllBytes(file);
+                                        try
+                                        {
+                                            certDictionary.Add(fileName,Dpapi.DescribeCertificate(certificateArray, MasterKeys)); 
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
+                                        }
+                                    }
+                                }
+                        }
+                        Console.WriteLine();
+
+                        foreach (var key in certDictionary.Keys)
+                        {
+                            if (certDictionary[key].First != "")
+                            {
+                                Console.WriteLine("[*] Private key file {0} was recovered\r\n", key);
+                                Console.WriteLine("[*] PKCS1 Private key\r\n");
+                                Console.WriteLine(certDictionary[key].First);
+                                Console.WriteLine("\r\n[*] Certificate\r\n");
+                                Console.WriteLine(certDictionary[key].Second);
+                                Console.WriteLine();
+                            }
+                        }
+                        Console.WriteLine("[*] Hint: openssl pkcs12 -export -inkey key.pem -in cert.cer -out cert.p12");
+                    }
+                }
+            }
+        }
         public static void TriageRDCMan(Dictionary<string, string> MasterKeys, string computerName = "", bool unprotect = false)
         {
             // search for RDCMan.settings files, parsing any found with TriageRDCManFile()
