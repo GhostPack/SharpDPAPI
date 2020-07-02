@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.AccessControl;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
@@ -602,7 +603,7 @@ namespace SharpDPAPI
         public static void TriageSystemCerts(Dictionary<string, string> MasterKeys)
         {
             if (!Helpers.IsHighIntegrity())
-                throw new Exception("Must be elevated to triage SYSTEM credentials!\r\n");
+                throw new PrivilegeNotHeldException("Must be elevated to triage SYSTEM credentials!\r\n");
 
             Console.WriteLine("\r\n[*] Triaging System Certificates\r\n");
 
@@ -637,9 +638,7 @@ namespace SharpDPAPI
             //TODO have not verified with multiple users
             if (Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && Helpers.TestRemote(computerName)))
             {
-                var userFolder = "";
-
-                userFolder = !String.IsNullOrEmpty(computerName) ?
+                var userFolder = !String.IsNullOrEmpty(computerName) ?
                     $"\\\\{computerName}\\C$\\Users\\" :
                     $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
 
@@ -692,15 +691,15 @@ namespace SharpDPAPI
 
                 foreach (var key in certDictionary.Keys)
                 {
-                    if (certDictionary[key].First != "")
-                    {
-                        Console.WriteLine("[*] Private key file {0} was recovered\r\n", key);
-                        Console.WriteLine("[*] PKCS1 Private key\r\n");
-                        Console.WriteLine(certDictionary[key].First);
-                        Console.WriteLine("\r\n[*] Certificate\r\n");
-                        Console.WriteLine(certDictionary[key].Second);
-                        Console.WriteLine();
-                    }
+                    if (string.IsNullOrEmpty(certDictionary[key].First)) 
+                        continue;
+
+                    Console.WriteLine("[*] Private key file {0} was recovered\r\n", key);
+                    Console.WriteLine("[*] PKCS1 Private key\r\n");
+                    Console.WriteLine(certDictionary[key].First);
+                    Console.WriteLine("\r\n[*] Certificate\r\n");
+                    Console.WriteLine(certDictionary[key].Second);
+                    Console.WriteLine();
                 }
                 Console.WriteLine("[*] Hint: openssl pkcs12 -export -inkey key.pem -in cert.cer -out cert.p12");
             }
@@ -759,6 +758,7 @@ namespace SharpDPAPI
 
             if (!File.Exists(credFile))
                 throw new Exception($"PSCredential .xml); file '{credFile}' is not accessible or doesn't exist!\n");
+
             var lastAccessed = File.GetLastAccessTime(credFile);
             var lastModified = File.GetLastWriteTime(credFile);
 
