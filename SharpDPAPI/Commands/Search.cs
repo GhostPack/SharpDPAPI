@@ -2,9 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
-using CodeProject;
 using Microsoft.Win32;
 
 namespace SharpDPAPI.Commands
@@ -12,7 +10,7 @@ namespace SharpDPAPI.Commands
     public class Search : ICommand
     {
         public static string CommandName => "search";
-        delegate void ProcessFileCallback(string path);
+        delegate void ProcessFileCallback(string path, bool showErrors);
 
 
         private static readonly byte[] dpapiBlobHeader =
@@ -73,6 +71,7 @@ namespace SharpDPAPI.Commands
                 throw new ArgumentException("/path argument not specified");
 
             var path = arguments["/path"];
+            var showErrors = arguments.ContainsKey("/showErrors");
 
             if (!Directory.Exists(path))
                 throw new ArgumentException($"The folder '{path}' does not exist");
@@ -81,17 +80,25 @@ namespace SharpDPAPI.Commands
             if (arguments.ContainsKey("/maxBytes") && !uint.TryParse(arguments["/maxBytes"], out maxBytes))
                 throw new ArgumentException($"Invalid uint value '{arguments["/maxBytes"]}' in the /maxBytes argument");
 
-            Console.WriteLine($"[*] Searching for the folder {path} for file containing DPAPI blobs the first {maxBytes} bytes\n");
+            Console.WriteLine($"[*] Searching for the folder {path} for files potentially containing DPAPI blobs the first {maxBytes} bytes\n");
 
-            FindFiles(path, maxBytes, (filePath) =>
+            FindFiles(path, maxBytes, showErrors, (filePath, displayErrors) =>
             {
-                if(FileContainsDpapiBlob(filePath, maxBytes))
-                    Console.WriteLine(filePath);
+                try
+                {
+                    if (FileContainsDpapiBlob(filePath, maxBytes))
+                        Console.WriteLine(filePath);
+                }
+                catch (Exception e)
+                {
+                    if(displayErrors)
+                        Console.WriteLine($"File Processing ERROR: {filePath} - {e.Message}");
+                }
             });
         }
 
 
-        private void FindFiles(string path, uint maxBytes, ProcessFileCallback processFile)
+        private void FindFiles(string path, uint maxBytes, bool showErrors, ProcessFileCallback processFile)
         {
             // Modified largely from https://developerslogblog.wordpress.com/2020/02/25/c-how-to-find-all-files-recursively-in-a-folder/
             var paths = new List<string>();
@@ -109,12 +116,13 @@ namespace SharpDPAPI.Commands
                     foreach (var directory in directories)
                         directoriesQueue.Enqueue(directory);
 
-                    foreach (var file in FastDirectoryEnumerator.EnumerateFiles(currentPath))
-                        processFile(file.Path);
+                    foreach (var file in Directory.GetFiles(currentPath))
+                        processFile(file, showErrors);
                 }
-                catch
+                catch(Exception e)
                 {
-                    //Console.WriteLine($"ERROR: {e}");
+                    if(showErrors)
+                        Console.WriteLine($"ERROR: {e}");
                 }
             }
         }
