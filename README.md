@@ -1154,7 +1154,7 @@ Retrieve the DPAPI backup key for the specified DC, outputting the backup key to
 The **search** comand will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs. Usage:
 ```
 SharpDPAPI.exe search /type:registry [/path:HKLM\path\to\key] [/showErrors]
-SharpDPAPI.exe search /type:folder /path:C:\path\to\folder [/maxBytes:<numOfBytes>]
+SharpDPAPI.exe search /type:folder /path:C:\path\to\folder [/maxBytes:<numOfBytes>] [/showErrors]
 SharpDPAPI.exe search /type:file /path:C:\path\to\file [/maxBytes:<numOfBytes>]
 SharpDPAPI.exe search /type:base64 [/base:<base64 string>]
 ```
@@ -1168,7 +1168,7 @@ The search command has different arguments depending on the data type being scan
 
 When searching the registry with no other arguments, the command will recursively search the HKEY_LOCAL_MACHINE and HKEY_USERS hives. Use `/path` parameter to specify a root to key to search from (e.g. `/path:HKLM\Software`) and use the `/showErrors` argument to display errors that occuring during enumeration.
 
-When searching a file or folder, specify a path with `/path:C:\Path\to\file\or\folder` and optionally use `/maxBytes:<int>` to specify the number of bytes to read from each file (default: 1024 bytes). The command will read the bytes from the beginning of the file and search for DPAPI blobs.
+When searching a file or folder, specify a path with `/path:C:\Path\to\file\or\folder` and optionally use `/maxBytes:<int>` to specify the number of bytes to read from each file (default: 1024 bytes). The command will read the bytes from the beginning of the file and search for DPAPI blobs. Use `/showErrors` to display an errors that occur during enumeration.
 
 When searching a base64 blob, specify the base64-encoded bytes to scan with the `/base64:<base64 str>` parameter.
 

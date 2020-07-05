@@ -80,7 +80,7 @@ namespace SharpDPAPI.Commands
             if (arguments.ContainsKey("/maxBytes") && !uint.TryParse(arguments["/maxBytes"], out maxBytes))
                 throw new ArgumentException($"Invalid uint value '{arguments["/maxBytes"]}' in the /maxBytes argument");
 
-            Console.WriteLine($"[*] Searching for the folder {path} for files potentially containing DPAPI blobs the first {maxBytes} bytes\n");
+            Console.WriteLine($"[*] Searching for the folder {path} for files potentially containing DPAPI blobs in the first {maxBytes} bytes\n");
 
             FindFiles(path, maxBytes, showErrors, (filePath, displayErrors) =>
             {
