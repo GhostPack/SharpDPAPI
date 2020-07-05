@@ -71,6 +71,7 @@
     <Compile Include="Commands\Machinemasterkeys.cs" />
     <Compile Include="Commands\Machinetriage.cs" />
     <Compile Include="Commands\Machinevaults.cs" />
+    <Compile Include="Commands\Search.cs" />
     <Compile Include="Commands\PS.cs" />
     <Compile Include="Commands\RDG.cs" />
     <Compile Include="Commands\Triage.cs" />
@@ -84,6 +85,7 @@
     <Compile Include="lib\BigInteger.cs" />
     <Compile Include="lib\Crypto.cs" />
     <Compile Include="lib\Dpapi.cs" />
+    <Compile Include="lib\FastDirectoryEnumerator.cs" />
     <Compile Include="lib\Helpers.cs" />
     <Compile Include="lib\Interop.cs" />
     <Compile Include="lib\LSADump.cs" />

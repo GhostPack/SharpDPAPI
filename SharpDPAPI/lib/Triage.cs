@@ -444,7 +444,7 @@ namespace SharpDPAPI
             var policyBytes = File.ReadAllBytes(policyFilePath);
 
             // first try to get vault keys from the Policy.vpol
-            var keys = Dpapi.DescribePolicy(policyBytes, MasterKeys);
+            var keys = Dpapi.DescribeVaultPolicy(policyBytes, MasterKeys);
 
             // make sure we have keys returned
             if (keys.Count <= 0) 

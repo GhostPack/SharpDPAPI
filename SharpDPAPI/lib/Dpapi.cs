@@ -7,7 +7,6 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace SharpDPAPI
 {
@@ -229,8 +228,7 @@ namespace SharpDPAPI
             return new byte[0];
         }
 
-        public static Tuple<string, string> DescribeCertificate(byte[] certificateBytes,
-            Dictionary<string, string> MasterKeys, bool machine = false)
+        public static Tuple<string, string> DescribeCertificate(byte[] certificateBytes, Dictionary<string, string> MasterKeys, bool machine = false)
         {
             var plaintextBytes = DescribeDPAPICertBlob(certificateBytes, MasterKeys);
             var keypairTuple = new Tuple<string, string>("", "");
@@ -259,8 +257,6 @@ namespace SharpDPAPI
                         store.Close();
                     }
 
-                    var found = false;
-
                     foreach (var cert in certCollection)
                     {
                         var PublicXML = cert.PublicKey.Key.ToXmlString(false).Replace("</RSAKeyValue>", "");
@@ -283,7 +279,6 @@ namespace SharpDPAPI
                             }
                             sb.AppendLine("-----END CERTIFICATE-----");
                             keypairTuple = new Tuple<string, string>(PrivatePKCS1, sb.ToString());
-                            found = true;
                             // Commented code for pfx generation due to MS not giving 
                             //a dispose method < .NET4.6 https://snede.net/the-most-dangerous-constructor-in-net/
                             //   X509Certificate2 certificate = new X509Certificate2(cert.RawData);
@@ -389,7 +384,7 @@ namespace SharpDPAPI
 
 
                 RSAKeyInfo.Modulus = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(modulus, true).ToHexString());
-                RSAKeyInfo.Exponent = Helpers.trimByte(Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(pubexp, true).ToHexString()));
+                RSAKeyInfo.Exponent = Helpers.TrimByte(Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(pubexp, true).ToHexString()));
                 RSAKeyInfo.D = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(privExponent, true).ToHexString());
                 RSAKeyInfo.P = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(prime1, true).ToHexString());
                 RSAKeyInfo.Q = Helpers.ConvertHexStringToByteArray(Helpers.OS2IP(prime2, true).ToHexString());
@@ -568,7 +563,7 @@ namespace SharpDPAPI
                 }
             }
 
-            else if (MasterKeys.ContainsKey(guidString))
+            if (MasterKeys.ContainsKey(guidString))
             {
                 // if this key is present, decrypt this blob
                 if (algHash == 32782)
@@ -654,7 +649,7 @@ namespace SharpDPAPI
             return new byte[0];
         }
 
-        public static ArrayList DescribePolicy(byte[] policyBytes, Dictionary<string, string> MasterKeys)
+        public static ArrayList DescribeVaultPolicy(byte[] policyBytes, Dictionary<string, string> MasterKeys)
         {
             // parses a vault policy file, attempting to decrypt if possible
             // a two-valued arraylist of the aes128/aes256 keys is returned if decryption is successful
@@ -1338,7 +1333,6 @@ namespace SharpDPAPI
         }
         public static byte[] CalculateKeys(string password, string directory, bool domain)
         {
-            var userDPAPIBasePath = $"{Environment.GetEnvironmentVariable("USERPROFILE")}\\AppData\\Roaming\\Microsoft\\Protect\\";
             var usersid = Path.GetFileName(directory).TrimEnd(Path.DirectorySeparatorChar);
 
             var utf16pass = Encoding.Unicode.GetBytes(password);
@@ -1457,8 +1451,6 @@ namespace SharpDPAPI
         public static KeyValuePair<string, string> DecryptMasterKeyWithSha(byte[] masterKeyBytes, byte[] shaBytes)
         {
             // takes masterkey bytes and SYSTEM_DPAPI masterkey sha bytes, returns a dictionary of guid:sha1 masterkey mappings
-            var mapping = new KeyValuePair<string, string>();
-
             var guidMasterKey = $"{{{Encoding.Unicode.GetString(masterKeyBytes, 12, 72)}}}";
 
             var mkBytes = GetMasterKey(masterKeyBytes);
