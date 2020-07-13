@@ -22,12 +22,20 @@ Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and 
   SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
 
 
+The *search* comand will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs:
+    
+    search /type:registry [/path:HKLM\path\to\key] [/showErrors]
+    search /type:folder /path:C:\path\to\folder [/maxBytes:<numOfBytes>] [/showErrors]
+    search /type:file /path:C:\path\to\file [/maxBytes:<numOfBytes>]
+    search /type:base64 [/base:<base64 string>]
+
+
 Machine/SYSTEM Triage:
 
     machinemasterkeys       -   triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret)
     machinecredentials      -   use 'machinemasterkeys' and then triage machine Credential files
     machinevaults           -   use 'machinemasterkeys' and then triage machine Vaults
-    machinecerts           -   use 'machinemasterkeys' and then triage machine certificate stores
+    machinecerts            -   use 'machinemasterkeys' and then triage machine certificate stores
     machinetriage           -   run the 'machinecredentials' and 'machinevaults' commands
 
 
