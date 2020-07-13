@@ -1150,6 +1150,29 @@ Retrieve the DPAPI backup key for the specified DC, outputting the backup key to
     [*] Backup key written to            : key.pvk
 
 
+#### search
+The **search** comand will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs. Usage:
+```
+SharpDPAPI.exe search /type:registry [/path:HKLM\path\to\key] [/showErrors]
+SharpDPAPI.exe search /type:folder /path:C:\path\to\folder [/maxBytes:<numOfBytes>] [/showErrors]
+SharpDPAPI.exe search /type:file /path:C:\path\to\file [/maxBytes:<numOfBytes>]
+SharpDPAPI.exe search /type:base64 [/base:<base64 string>]
+```
+The `search` command works by searching for the following bytes, which represent the header (Version + DPAPI provider GUID) of DPAPI blob structure:
+
+```
+0x01, 0x00, 0x00, 0x00, 0xD0, 0x8C, 0x9D, 0xDF, 0x01, 0x15, 0xD1, 0x11, 0x8C, 0x7A, 0x00, 0xC0, 0x4F, 0xC2, 0x97, 0xEB
+```
+
+The search command has different arguments depending on the data type being scanned. To designate the data type, use the `/type` argument specifying `registry`, `folder`, `file`, or `base64`. If the `/type` argument is not present, the command will search the registry by default. 
+
+When searching the registry with no other arguments, the command will recursively search the HKEY_LOCAL_MACHINE and HKEY_USERS hives. Use `/path` parameter to specify a root to key to search from (e.g. `/path:HKLM\Software`) and use the `/showErrors` argument to display errors that occuring during enumeration.
+
+When searching a file or folder, specify a path with `/path:C:\Path\to\file\or\folder` and optionally use `/maxBytes:<int>` to specify the number of bytes to read from each file (default: 1024 bytes). The command will read the bytes from the beginning of the file and search for DPAPI blobs. Use `/showErrors` to display an errors that occur during enumeration.
+
+When searching a base64 blob, specify the base64-encoded bytes to scan with the `/base64:<base64 str>` parameter.
+
+
 ## SharpChrome Commands
 
 ### logins

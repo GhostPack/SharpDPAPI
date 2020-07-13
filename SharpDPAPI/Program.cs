@@ -1,12 +1,16 @@
 ﻿using SharpDPAPI.Domain;
 using System;
+using System.Diagnostics;
 
 namespace SharpDPAPI
 {
     class Program
     {
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+
             try
             {
                 Info.Logo();
@@ -33,6 +37,9 @@ namespace SharpDPAPI
                 Console.WriteLine("\r\n[!] Unhandled SharpDPAPI exception:\r\n");
                 Console.WriteLine(e);
             }
+
+            sw.Stop();
+            Console.WriteLine("\n\nSharpDPAPI completed in " + sw.Elapsed);
         }
     }
 }
