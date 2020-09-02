@@ -81,6 +81,7 @@
     <Compile Include="Commands\Cookies.cs" />
     <Compile Include="Commands\ICommand.cs" />
     <Compile Include="Commands\Logins.cs" />
+    <Compile Include="Commands\Statekeys.cs" />
     <Compile Include="Domain\ArgumentParser.cs" />
     <Compile Include="Domain\ArgumentParserResult.cs" />
     <Compile Include="Domain\CommandCollection.cs" />

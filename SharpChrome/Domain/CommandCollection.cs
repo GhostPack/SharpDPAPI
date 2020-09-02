@@ -20,6 +20,7 @@ namespace SharpChrome.Domain
             _availableCommands.Add(Backupkey.CommandName, () => new Backupkey());
             _availableCommands.Add(Logins.CommandName, () => new Logins());
             _availableCommands.Add(Cookies.CommandName, () => new Cookies());
+            _availableCommands.Add(Statekeys.CommandName, () => new Statekeys());
         }
 
         public bool ExecuteCommand(string commandName, Dictionary<string, string> arguments)

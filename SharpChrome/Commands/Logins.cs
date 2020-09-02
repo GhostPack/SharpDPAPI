@@ -10,13 +10,21 @@ namespace SharpChrome.Commands
 
         public void Execute(Dictionary<string, string> arguments)
         {
-            Console.WriteLine("\r\n[*] Action: Chrome Saved Logins Triage\r\n");
             arguments.Remove("logins");
 
             string displayFormat = "csv";   // "csv" or "table" display
             string server = "";             // used for remote server specification
             bool showAll = false;           // whether to display entries with null passwords
             bool unprotect = false;         // whether to force CryptUnprotectData()
+            string stateKey = "";           // decrypted AES statekey to use for cookie decryption
+            string browser = "chrome";      // alternate Chromiun browser to specify, currently only "edge" is supported
+
+            if (arguments.ContainsKey("/browser"))
+            {
+                browser = arguments["/browser"].ToLower();
+            }
+
+            Console.WriteLine("\r\n[*] Action: {0} Saved Logins Triage\r\n", SharpDPAPI.Helpers.Capitalize(browser));
 
             if (arguments.ContainsKey("/format"))
             {
@@ -31,6 +39,12 @@ namespace SharpChrome.Commands
             if (arguments.ContainsKey("/showall"))
             {
                 showAll = true;
+            }
+
+            if (arguments.ContainsKey("/statekey"))
+            {
+                stateKey = arguments["/statekey"];
+                Console.WriteLine("[*] Using AES State Key: {0}]\r\n", stateKey);
             }
 
             if (arguments.ContainsKey("/server"))
@@ -74,11 +88,17 @@ namespace SharpChrome.Commands
             if (arguments.ContainsKey("/target"))
             {
                 string target = arguments["/target"].Trim('"').Trim('\'');
+                byte[] stateKeyBytes = null;
+
+                if (!String.IsNullOrEmpty(stateKey))
+                {
+                    stateKeyBytes = SharpDPAPI.Helpers.ConvertHexStringToByteArray(stateKey);
+                }
 
                 if (File.Exists(target))
                 {
                     Console.WriteLine("[*] Target 'Login Data' File: {0}\r\n", target);
-                    Chrome.ParseChromeLogins(masterkeys, target, displayFormat, showAll, unprotect);
+                    Chrome.ParseChromeLogins(masterkeys, target, displayFormat, showAll, unprotect, stateKeyBytes);
                 }
                 else
                 {
@@ -93,7 +113,7 @@ namespace SharpChrome.Commands
                 }
                 else
                 {
-                    Chrome.TriageChromeLogins(masterkeys, server, displayFormat, showAll, unprotect);
+                    Chrome.TriageChromeLogins(masterkeys, server, displayFormat, showAll, unprotect, stateKey, browser);
                 }
             }
         }

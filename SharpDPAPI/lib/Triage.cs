@@ -91,7 +91,6 @@ namespace SharpDPAPI
                             if (!String.IsNullOrEmpty(password))
                             {
                                 plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
-                                mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
                             }
                             else
                             {

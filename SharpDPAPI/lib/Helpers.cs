@@ -126,6 +126,23 @@ namespace SharpDPAPI
 
             return HexAsBytes;
         }
+
+        public static string Capitalize(string s)
+        {
+            if(s.Length == 1)
+            {
+                return char.ToUpper(s[0]) + "";
+            }
+            else if (s.Length > 1)
+            {
+                return char.ToUpper(s[0]) + s.Substring(1);
+            }
+            else
+            {
+                return "";
+            }
+        }
+
         public static bool TestRemote(string computerName)
         {
             try

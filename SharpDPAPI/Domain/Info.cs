@@ -4,7 +4,7 @@ namespace SharpDPAPI.Domain
 {
     public static class Info
     {
-        public static void Logo()
+        public static void ShowLogo()
         {
             Console.WriteLine("\r\n  __                 _   _       _ ___ ");
             Console.WriteLine(" (_  |_   _. ._ ._  | \\ |_) /\\  |_) |  ");

@@ -8,6 +8,8 @@
 
 The [SharpChrome](#sharpchrome) subproject is an adaptation of work from [@gentilkiwi](https://twitter.com/gentilkiwi) and [@djhohnstein](https://twitter.com/djhohnstein), specifically his [SharpChrome project](https://github.com/djhohnstein/SharpChrome/). However, this version of SharpChrome uses a different version of the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) that supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199). SharpChrome is built as a separate project in SharpDPAPI because of the size of the SQLite library utilized.
 
+Both Chrome and newer Chromium-based Edge browsers can be triaged with SharpChrome.
+
 SharpChrome also uses an minimized version of @AArnott's [BCrypt P/Invoke code](https://github.com/AArnott/pinvoke/tree/master/src/BCrypt) released under the MIT License.
 
 If you're unfamiliar with DPAPI, [check out this post](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/) for more background information. For more information on Credentials and Vaults in regards to DPAPI, check out Benjamin's [wiki entry on the subject.](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials)
@@ -49,6 +51,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
   * [SharpChrome Commands](#sharpchrome-commands)
     + [logins](#logins)
     + [cookies](#cookies)
+    + [statekeys](#statekeys)
     + [backupkey](#backupkey-1)
   * [Compile Instructions](#compile-instructions)
     + [Targeting other .NET versions](#targeting-other-net-versions)
@@ -63,7 +66,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
-      v1.7.0
+      v1.9.0
 
 
 
@@ -72,12 +75,20 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
 
 
+    The *search* comand will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs:
+
+        search /type:registry [/path:HKLM\path\to\key] [/showErrors]
+        search /type:folder /path:C:\path\to\folder [/maxBytes:<numOfBytes>] [/showErrors]
+        search /type:file /path:C:\path\to\file [/maxBytes:<numOfBytes>]
+        search /type:base64 [/base:<base64 string>]
+
+
     Machine/SYSTEM Triage:
 
         machinemasterkeys       -   triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret)
         machinecredentials      -   use 'machinemasterkeys' and then triage machine Credential files
         machinevaults           -   use 'machinemasterkeys' and then triage machine Vaults
-        machinecerts           -   use 'machinemasterkeys' and then triage machine certificate stores
+        machinecerts            -   use 'machinemasterkeys' and then triage machine certificate stores
         machinetriage           -   run the 'machinecredentials' and 'machinevaults' commands
 
 
@@ -109,14 +120,13 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
           These functions wrap all the other applicable functions that can be automatically run.
 
 
-
 #### SharpChrome Command Line Usage
 
       __                 _
      (_  |_   _. ._ ._  /  |_  ._ _  ._ _   _
      __) | | (_| |  |_) \_ | | | (_) | | | (/_
                     |
-      v1.6.1
+      v1.9.0
 
 
     Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
@@ -124,29 +134,32 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       SharpChrome backupkey [/server:SERVER.domain] [/file:key.pvk]
 
 
-    Global arguments for the 'cookies' and 'logins' commands:
+    Global arguments for the 'cookies', 'logins', and 'statekeys' commands:
 
         Decryption:
-            /unprotect      -   force use of CryptUnprotectData() (default for unprivileged execution)
-            /password:X     -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
-            GUID1:SHA1 ...  -   use a one or more GUID:SHA1 masterkeys for decryption
-            /mkfile:FILE    -   use a file of one or more GUID:SHA1 masterkeys for decryption
-            /pvk:BASE64...  -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
-            /pvk:key.pvk    -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+            /unprotect          -   force use of CryptUnprotectData() (default for unprivileged execution)
+            /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
+            GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
+            /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
+            /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
+            /pvk:key.pvk        -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+            /statekey:X         -   a decrypted AES state key (from the 'statekeys' command)
 
         Targeting:
-            /target:FILE    -   triage a specific 'Cookies' or 'Login Data' file location
-            /server:SERVER  -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
+            /target:FILE        -   triage a specific 'Cookies', 'Login Data', or 'Local State' file location
+            /server:SERVER      -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
+            /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'edge'
 
         Output:
-            /format:X       -   either 'csv' (default) or 'table' display
-            /showall        -   show Login Data entries with null passwords and expired Cookies instead of filtering (default)
+            /format:X           -   either 'csv' (default) or 'table' display
+            /showall            -   show Login Data entries with null passwords and expired Cookies instead of filtering (default)
+            /consoleoutfile:X   -   output all console output to a file on disk
 
 
     'cookies' command specific arguments:
 
-            /cookie:"REGEX"   -   only return cookies where the cookie name matches the supplied regex
-            /url:"REGEX"      -   only return cookies where the cookie URL matches the supplied regex
+            /cookie:"REGEX"     -   only return cookies where the cookie name matches the supplied regex
+            /url:"REGEX"        -   only return cookies where the cookie URL matches the supplied regex
             /format:json        -   output cookie values in an EditThisCookie JSON import format. Best when used with a regex!
             /setneverexpire     -   set expirations for cookies output to now + 100 years (for json output)
 
@@ -175,7 +188,7 @@ SharpChrome is a Chrome-specific implementation of SharpDPAPI capable of **cooki
 
 Since Chrome Cookies/Login Data are saved without CRYPTPROTECT_SYSTEM, CryptUnprotectData() is back on the table. If SharpChrome is run from an unelevated contect, it will attempt to decrypt any logins/cookies for the current user using CryptUnprotectData(). A `/pvk:[BASE64|file.pvk]`, {GUID}:SHA1 lookup table, `/password:X`, or `/mkfile:FILE` of {GUID}:SHA1 values can also be used to decrypt values. Also, the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) used (with a few modifications) supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199), meaning that Chrome does not have to be closed/target files do not have to be copied to another location.
 
-If Chrome is version 80+, an AES state key is stored in *AppData\Local\Google\Chrome\User Data\Local State* - this key is protected with DPAPI, so we can use CryptUnprotectData()/pvk/masterkey lookup tables to decrypt it. This AES key is then used to protect new cookie and login data entries.
+If Chrome is version 80+, an AES state key is stored in *AppData\Local\Google\Chrome\User Data\Local State* - this key is protected with DPAPI, so we can use CryptUnprotectData()/pvk/masterkey lookup tables to decrypt it. This AES key is then used to protect new cookie and login data entries. This is also the process when `/browser:edge` is specified, for newer Chromium-based Edge browser triage.
 
 By default, cookies and logins are displayed as a csv - this can be changed with `/format:table` for table output, and `/format:json` for cookies specifically. The json option outputs cookies in a json format that can be imported into the [EditThisCookie](https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg?hl=en) Chrome extension for easy reuse.
 
@@ -1177,11 +1190,11 @@ When searching a base64 blob, specify the base64-encoded bytes to scan with the 
 
 ### logins
 
-The **logins** command will search for Chrome 'Login Data' files and decrypt the saved login passwords. If execution is in an unelevated contect, CryptProtectData() will automatically be used to try to decrypt values.
+The **logins** command will search for Chrome 'Login Data' files and decrypt the saved login passwords. If execution is in an unelevated contect, CryptProtectData() will automatically be used to try to decrypt values. If `/browser:edge` is specified, the newer Chromium-based Edge browser is triaged.
 
 Login Data files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
-A specific Login Data file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` is also supplied.
+A specific Login Data file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` is also supplied. If triaging newer Chrome/Edge instances, a `/statekey:X` AES state key can be specified.
 
 By default, logins are displayed in a csv format. This can be modified with `/format:table` for table output. Also, by default only non-null password value entries are displayed, but all values can be displayed with `/showall`.
 
@@ -1189,17 +1202,25 @@ If run from an elevated context, Login Data files for ALL users will be triaged,
 
 ### cookies
 
-The **cookies** command will search for Chrome 'Cookies' files and decrypt cookie values. If execution is in an unelevated contect, CryptProtectData() will automatically be used to try to decrypt values.
+The **cookies** command will search for Chrome 'Cookies' files and decrypt cookie values. If execution is in an unelevated contect, CryptProtectData() will automatically be used to try to decrypt values. If `/browser:edge` is specified, the newer Chromium-based Edge browser is triaged.
 
 Cookie files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
-A specific Cookies file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` is also supplied.
+A specific Cookies file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` is also supplied. If triaging newer Chrome/Edge instances, a `/statekey:X` AES state key can be specified.
 
 By default, cookies are displayed in a csv format. This can be modified with `/format:table` for table output, or `/format:json` for output importable by [EditThisCookie](https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg?hl=en). Also, by default only non-expired cookie value entries are displayed, but all values can be displayed with `/showall`.
 
 If run from an elevated context, Cookie files for ALL users will be triaged, otherwise only Cookie files for the current user will be processed.
 
 The **cookies** command also has `/cookie:REGEX` and `/url:REGEX` arguments to only return cookie names or urls matching the supplied regex. This is useful with `/format:json` to easily clone access to specific sites.
+
+### statekeys
+
+The **statekeys** command will search for Chrome/Edge AES statekey files (i.e. 'AppData\Local\Google\Chrome\User Data\Local State' and 'AppData\Local\Microsoft\Edge\User Data\Local State') and decrypts them using the same type of arguments that can be supplied for `cookies` and `logins`.
+
+State keys can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+
+If run from an elevated context, state keys for ALL users will be triaged, otherwise only state keys for the current user will be processed.
 
 ### backupkey
 
@@ -1211,11 +1232,12 @@ This base64 key blob can be decoded to a binary .pvk file that can then be used 
 
 By default, SharpDPAPI will try to determine the current domain controller via the **DsGetDcName** API call. A server can be specified with `/server:COMPUTER.domain.com`. If you want the key saved to disk instead of output as a base64 blob, use `/file:key.pvk`.
 
+
 ## Compile Instructions
 
 We are not planning on releasing binaries for SharpDPAPI, so you will have to compile yourself :)
 
-SharpDPAPI has been built against .NET 3.5 and is compatible with [Visual Studio 2015 Community Edition](https://go.microsoft.com/fwlink/?LinkId=532606&clcid=0x409). Simply open up the project .sln, choose "Release", and build.
+SharpDPAPI has been built against .NET 3.5 and is compatible with [Visual Studio 2019 Community Edition](https://visualstudio.microsoft.com/vs/community/). Simply open up the project .sln, choose "Release", and build.
 
 ### Targeting other .NET versions
 
@@ -1234,3 +1256,18 @@ SharpDPAPI can then be loaded in a PowerShell script with the following (where "
 The Main() method and any arguments can then be invoked as follows:
 
     [SharpDPAPI.Program]::Main("machinemasterkeys")
+
+#### Sidenote Sidenote: Running SharpDPAPI Over PSRemoting
+
+Due to the way PSRemoting handles output, we need to redirect stdout to a string and return that instead. Luckily, SharpDPAPI has a function to help with that.
+
+If you follow the instructions in [Sidenote: Running SharpDPAPI Through PowerShell](#sidenote-running-sharpdpapi-through-powershell) to create a SharpDPAPI.ps1, append something like the following to the script:
+
+    [SharpDPAPI.Program]::MainString("machinemasterkeys")
+
+You should then be able to run SharpDPAPI over PSRemoting with something like the following:
+
+    $s = New-PSSession dc.theshire.local
+    Invoke-Command -Session $s -FilePath C:\Temp\SharpDPAPI.ps1
+
+Alternatively, SharpDPAPI `/consoleoutfile:C:\FILE.txt` argument will redirect all output streams to the specified file.
