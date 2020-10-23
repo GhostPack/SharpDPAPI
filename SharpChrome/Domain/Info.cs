@@ -35,19 +35,20 @@ Global arguments for the 'cookies', 'logins', and 'statekeys' commands:
     Targeting:
         /target:FILE        -   triage a specific 'Cookies', 'Login Data', or 'Local State' file location
         /server:SERVER      -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
-        /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'edge'
+        /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'edge'/'brave'
     
     Output:
         /format:X           -   either 'csv' (default) or 'table' display
         /showall            -   show Login Data entries with null passwords and expired Cookies instead of filtering (default)
         /consoleoutfile:X   -   output all console output to a file on disk
+        /quiet              -   don't output headers/etc. (for .csv/.json file output)
 
 
 'cookies' command specific arguments:
     
         /cookie:""REGEX""     -   only return cookies where the cookie name matches the supplied regex
         /url:""REGEX""        -   only return cookies where the cookie URL matches the supplied regex
-        /format:json        -   output cookie values in an EditThisCookie JSON import format. Best when used with a regex!
+        /format:json        -   output cookie values in an Cookie-Editor JSON import format. Best when used with a regex!
         /setneverexpire     -   set expirations for cookies output to now + 100 years (for json output)
 
 ";

@@ -16,15 +16,25 @@ namespace SharpChrome.Commands
             string server = "";             // used for remote server specification
             bool showAll = false;           // whether to display entries with null passwords
             bool unprotect = false;         // whether to force CryptUnprotectData()
+            bool quiet = false;             // don't display headers/logos/etc. (for csv/json output)
             string stateKey = "";           // decrypted AES statekey to use for cookie decryption
-            string browser = "chrome";      // alternate Chromiun browser to specify, currently only "edge" is supported
+            string browser = "chrome";      // alternate Chromiun browser to specify, currently supported: "chrome", "edge", "brave"
+
+
+            if (arguments.ContainsKey("/quiet"))
+            {
+                quiet = true;
+            }
 
             if (arguments.ContainsKey("/browser"))
             {
                 browser = arguments["/browser"].ToLower();
             }
 
-            Console.WriteLine("\r\n[*] Action: {0} Saved Logins Triage\r\n", SharpDPAPI.Helpers.Capitalize(browser));
+            if (!quiet)
+            {
+                Console.WriteLine("\r\n[*] Action: {0} Saved Logins Triage\r\n", SharpDPAPI.Helpers.Capitalize(browser));
+            }
 
             if (arguments.ContainsKey("/format"))
             {
@@ -44,13 +54,19 @@ namespace SharpChrome.Commands
             if (arguments.ContainsKey("/statekey"))
             {
                 stateKey = arguments["/statekey"];
-                Console.WriteLine("[*] Using AES State Key: {0}]\r\n", stateKey);
+                if (!quiet)
+                {
+                    Console.WriteLine("[*] Using AES State Key: {0}]\r\n", stateKey);
+                }
             }
 
             if (arguments.ContainsKey("/server"))
             {
                 server = arguments["/server"];
-                Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
+                if (!quiet)
+                {
+                    Console.WriteLine("[*] Triaging remote server: {0}\r\n", server);
+                }
             }
 
             // {GUID}:SHA1 keys are the only ones that don't start with /
@@ -74,7 +90,10 @@ namespace SharpChrome.Commands
             else if (arguments.ContainsKey("/password"))
             {
                 string password = arguments["/password"];
-                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
+                if (!quiet)
+                {
+                    Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
+                }
                 if (arguments.ContainsKey("/server"))
                 {
                     masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
@@ -97,8 +116,11 @@ namespace SharpChrome.Commands
 
                 if (File.Exists(target))
                 {
-                    Console.WriteLine("[*] Target 'Login Data' File: {0}\r\n", target);
-                    Chrome.ParseChromeLogins(masterkeys, target, displayFormat, showAll, unprotect, stateKeyBytes);
+                    if (!quiet)
+                    {
+                        Console.WriteLine("[*] Target 'Login Data' File: {0}\r\n", target);
+                    }
+                    Chrome.ParseChromeLogins(masterkeys, target, displayFormat, showAll, unprotect, stateKeyBytes, quiet);
                 }
                 else
                 {
@@ -113,7 +135,7 @@ namespace SharpChrome.Commands
                 }
                 else
                 {
-                    Chrome.TriageChromeLogins(masterkeys, server, displayFormat, showAll, unprotect, stateKey, browser);
+                    Chrome.TriageChromeLogins(masterkeys, server, displayFormat, showAll, unprotect, stateKey, browser, quiet);
                 }
             }
         }

@@ -39,7 +39,10 @@ namespace SharpChrome
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
-            Info.ShowLogo();
+            if (!parsedArgs.ContainsKey("/quiet"))
+            {
+                Info.ShowLogo();
+            }
 
             try
             {
@@ -56,7 +59,11 @@ namespace SharpChrome
             }
 
             sw.Stop();
-            Console.WriteLine("\n\nSharpChrome completed in " + sw.Elapsed);
+
+            if (!parsedArgs.ContainsKey("/quiet"))
+            {
+                Console.WriteLine("\n\nSharpChrome completed in " + sw.Elapsed);
+            }
         }
 
         public static string MainString(string command)
