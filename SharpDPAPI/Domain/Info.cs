@@ -41,9 +41,13 @@ Machine/SYSTEM Triage:
 
 User Triage:
 
-    Triage all reachable user masterkey files, use a domain backup key to decrypt all that are found:
+    Arguments for the 'masterkeys' command:
 
-      SharpDPAPI masterkeys </pvk:BASE64... | /pvk:key.pvk>    
+        /target:FILE/folder     -   triage a specific masterkey, or a folder full of masterkeys (otherwise triage local masterkeys)
+        /pvk:BASE64...          -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
+        /pvk:key.pvk            -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+        /password:X             -   first decrypt the current user's masterkeys using a plaintext password (works remotely)
+        /server:SERVER          -   triage a remote server, assuming admin access
 
 
     Arguments for the certificates|credentials|vaults|rdg|triage|blob|ps commands:
@@ -59,7 +63,7 @@ User Triage:
         Targeting:
             /target:FILE/folder -   triage a specific 'Credentials','.rdg|RDCMan.settings', 'blob', or 'ps' file location, or 'Vault' folder
             /server:SERVER      -   triage a remote server, assuming admin access
-                                    Note: must use with /pvk:KEY
+                                    Note: must use with /pvk:KEY or /password:X
                                     Note: not applicable to 'blob' or 'ps' commands
 
 

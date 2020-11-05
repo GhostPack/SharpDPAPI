@@ -232,6 +232,7 @@ namespace SharpDPAPI
         {
             var plaintextBytes = DescribeDPAPICertBlob(certificateBytes, MasterKeys);
             var keypairTuple = new Tuple<string, string>("", "");
+            
             if (plaintextBytes.Length > 0)
             {
                 var decryptedRSATuple = ParseDecCertBlob(plaintextBytes);
@@ -270,7 +271,6 @@ namespace SharpDPAPI
                             int BufferSize = 64;
                             int Index = 0;
                             var sb = new StringBuilder();
-
                             sb.AppendLine("-----BEGIN CERTIFICATE-----");
                             for (var i = 0; i < b64cert.Length; i += 64)
                             {

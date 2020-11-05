@@ -32,6 +32,11 @@ namespace SharpDPAPI.Commands
                     Console.WriteLine("[*] Triaging remote server: {0}\r\n", arguments["/server"]);
                     mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true, arguments["/server"]);
                 }
+                else if (arguments.ContainsKey("/target"))
+                {
+                    Console.WriteLine("[*] Triaging masterkey target: {0}\r\n", arguments["/target"]);
+                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true, "", "", arguments["/target"]);
+                }
                 else
                 {
                     Console.WriteLine();
@@ -57,17 +62,19 @@ namespace SharpDPAPI.Commands
                 return;
             }
 
-
-            if (mappings.Count == 0)
+            if (!arguments.ContainsKey("/password"))
             {
-                Console.WriteLine("\r\n[!] No master keys decrypted!\r\n");
-            }
-            else
-            {
-                Console.WriteLine("\r\n[*] User master key cache:\r\n");
-                foreach (KeyValuePair<string, string> kvp in mappings)
+                if (mappings.Count == 0)
                 {
-                    Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
+                    Console.WriteLine("\r\n[!] No master keys decrypted!\r\n");
+                }
+                else
+                {
+                    Console.WriteLine("\r\n[*] User master key cache:\r\n");
+                    foreach (KeyValuePair<string, string> kvp in mappings)
+                    {
+                        Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
+                    }
                 }
             }
         }
