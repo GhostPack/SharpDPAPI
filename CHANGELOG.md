@@ -5,19 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [1.9.0] - 2020-09-02
+## [1.9.1] - 2020-11-05
+
+### Added
+* **SharpDPAPI** project
+    * Ability to triage masterkey targets (or folder of targets) manually
 
 ### Added
 * **SharpChrome** project
-    * Added the ability to target Chromium-based Edge instances for `cookies` and `logins` with `/browser:edge`
-    * Added the `statekeys` command to triage reachable Chromiun AES state keys.
-    * Added the ability to supply `/statekey:X` to `cookies` and `logins` commands.
+    * Added Chromium-based brave support
+    * Added `/quiet` flag for csv output
 
 ### Fixed
 * **SharpChrome** project
-    * Cookie expires filtering for 0 values.
-
-* the **/consoleoutfile** argument to redirect console output to a file, and the public `MainString("command")` function to work over PSRemoting (see end of README.md)
+    * Filtering fixes for cookies
 
 
 ## [1.8.0] - 2020-07-13
