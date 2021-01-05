@@ -83,6 +83,7 @@
     <Compile Include="Domain\Version.cs" />
     <Compile Include="lib\Backup.cs" />
     <Compile Include="lib\BigInteger.cs" />
+    <Compile Include="lib\Certificate.cs" />
     <Compile Include="lib\Crypto.cs" />
     <Compile Include="lib\Dpapi.cs" />
     <Compile Include="lib\Helpers.cs" />

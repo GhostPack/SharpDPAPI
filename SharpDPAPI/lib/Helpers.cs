@@ -38,6 +38,7 @@ namespace SharpDPAPI
                 }
             }
         }
+
         public static void EncodeIntegerBigEndian(BinaryWriter stream, byte[] value, bool forceUnsigned = true)
         {
             stream.Write((byte)0x02); // INTEGER
@@ -553,7 +554,6 @@ namespace SharpDPAPI
                 hex.AppendFormat("{0:x2}", b);
             return hex.ToString();
         }
-
 
         public static bool Contains<T>(this T[] array, T[] candidate)
         {

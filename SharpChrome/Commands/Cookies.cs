@@ -74,7 +74,7 @@ namespace SharpChrome.Commands
                 stateKey = arguments["/statekey"];
                 if (!quiet)
                 {
-                    Console.WriteLine("[*] Using AES State Key: {0}]\r\n", stateKey);
+                    Console.WriteLine("[*] Using AES State Key: {0}\r\n", stateKey);
                 }
             }
 

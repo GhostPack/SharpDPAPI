@@ -27,7 +27,20 @@ namespace SharpDPAPI.Commands
                 }
                 Console.WriteLine();
 
-                Triage.TriageSystemCerts(mappings);
+                if (arguments.ContainsKey("/target"))
+                {
+                    string target = arguments["/target"].Trim('"').Trim('\'');
+
+                    Console.WriteLine("[*] Target Certificate File: {0}\r\n", target);
+                    Triage.TriageCertFile(target, mappings, true);
+                }
+
+                else
+                {
+                    Triage.TriageSystemCerts(mappings);
+                }
+
+                Console.WriteLine("[*] Hint: openssl pkcs12 -in cert.pem -keyex -CSP \"Microsoft Enhanced Cryptographic Provider v1.0\" -export -out cert.pfx");
             }
         }
     }

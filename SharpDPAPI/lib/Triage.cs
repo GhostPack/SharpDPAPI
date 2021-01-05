@@ -575,29 +575,50 @@ namespace SharpDPAPI
             Console.WriteLine();
         }
 
-        public static void TriageCertFile(string certFilePath, Dictionary<string, string> MasterKeys)
+        public static void TriageCertFile(string certFilePath, Dictionary<string, string> MasterKeys, bool machine = false)
         {
             // triage a certificate file
+
+            var fileName = Path.GetFileName(certFilePath);
+            Console.WriteLine("\r\n  Certificate file      : {0}\r\n", fileName);
+            var certificateArray = File.ReadAllBytes(certFilePath);
             try
             {
-                var certDictionary = new Dictionary<string, Tuple<string, string>>();
-                var fileName = Path.GetFileName(certFilePath);
-                Console.WriteLine("  Certificate file           : {0}\r\n", fileName);
+                ExportedCertificate cert = Dpapi.DescribeCertificate(certificateArray, MasterKeys, machine);
 
-                var certificateArray = File.ReadAllBytes(certFilePath);
-                try
+                if (cert.Thumbprint != "")
                 {
-                    certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys));
+                    Console.WriteLine("    Thumbprint: {0}", cert.Thumbprint);
+                    Console.WriteLine("    Issuer: {0}", cert.Issuer);
+                    Console.WriteLine("    Subject: {0}", cert.Subject);
+                    Console.WriteLine("    Valid Date: {0}", cert.ValidDate);
+                    Console.WriteLine("    Expiry Date: {0}", cert.ExpiryDate);
                 }
-                catch (Exception e)
+
+                if (cert.EKUs.Count > 0)
                 {
-                    Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
+                    Console.WriteLine("    Enhanced Key Usages:");
+                    foreach (var eku in cert.EKUs)
+                    {
+                        Console.WriteLine("        {0} ({1})", eku.First, eku.Second);
+                        if (eku.Second == "1.3.6.1.5.5.7.3.2")
+                        {
+                            Console.WriteLine("         [!] Certificate is used for client auth!");
+                        }
+                    }
                 }
-                Console.WriteLine();
+
+                if (cert.PrivateKey != "")
+                {
+                    Console.WriteLine("    [*] Private key file {0} was recovered:\r\n", fileName);
+                    Console.WriteLine(cert.PrivateKey);
+                    Console.WriteLine(cert.PublicCertificate);
+                    Console.WriteLine();
+                }
             }
             catch (Exception e)
             {
-                Console.WriteLine("[X] Error triaging {0} : {1}", certFilePath, e.Message);
+                Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
             }
 
             Console.WriteLine();
@@ -606,7 +627,6 @@ namespace SharpDPAPI
         public static void TriageCertFolder(string folder, Dictionary<string, string> MasterKeys, bool machine = false)
         {
             // triage a specific certificate folder
-            var certDictionary = new Dictionary<string, Tuple<string, string>>();
             if (!Directory.Exists(folder))
                 return;
 
@@ -621,38 +641,11 @@ namespace SharpDPAPI
                         @"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")
                     )
                     {
-                        var fileName = Path.GetFileName(file);
-                        Console.WriteLine("\r\nCertificate file           : {0}\r\n", fileName);
-                        var certificateArray = File.ReadAllBytes(file);
-                        try
-                        {
-                            certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys, machine));
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
-                        }
+                        TriageCertFile(file, MasterKeys, machine);
                     }
                 }
-            }
-            else
-            {
-                Console.WriteLine("\r\n[X] Folder '{0}' doesn't contain files!", folder);
-            }
 
-            Console.WriteLine();
-
-            foreach (var key in certDictionary.Keys)
-            {
-                if (certDictionary[key].First != "")
-                {
-                    Console.WriteLine("[*] Private key file {0} was recovered\r\n", key);
-                    Console.WriteLine("[*] PKCS1 Private key\r\n");
-                    Console.WriteLine(certDictionary[key].First);
-                    Console.WriteLine("\r\n[*] Certificate\r\n");
-                    Console.WriteLine(certDictionary[key].Second);
-                    Console.WriteLine();
-                }
+                Console.WriteLine();
             }
         }
 
@@ -679,7 +672,6 @@ namespace SharpDPAPI
 
         public static void TriageUserCerts(Dictionary<string, string> MasterKeys, string computerName = "")
         {
-
             string[] userDirs;
             if (!String.IsNullOrEmpty(computerName))
             {
@@ -723,43 +715,12 @@ namespace SharpDPAPI
 
                 foreach (var directory in directories)
                 {
-                    var files = Directory.GetFiles(directory);
-
-                    foreach (var file in files)
-                    {
-                        if (!Regex.IsMatch(file, @"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}"))
-                            continue;
-
-                        var fileName = Path.GetFileName(file);
-                        Console.WriteLine("\r\nCertificate file           : {0}\r\n", fileName);
-                        var certificateArray = File.ReadAllBytes(file);
-                        try
-                        {
-                            certDictionary.Add(fileName, Dpapi.DescribeCertificate(certificateArray, MasterKeys));
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
-                        }
-                    }
+                    TriageCertFolder(directory, MasterKeys);
                 }
                 Console.WriteLine();
-
-                foreach (var key in certDictionary.Keys)
-                {
-                    if (string.IsNullOrEmpty(certDictionary[key].First)) 
-                        continue;
-
-                    Console.WriteLine("[*] Private key file {0} was recovered\r\n", key);
-                    Console.WriteLine("[*] PKCS1 Private key\r\n");
-                    Console.WriteLine(certDictionary[key].First);
-                    Console.WriteLine("\r\n[*] Certificate\r\n");
-                    Console.WriteLine(certDictionary[key].Second);
-                    Console.WriteLine();
-                }
-                Console.WriteLine("[*] Hint: openssl pkcs12 -export -inkey key.pem -in cert.cer -out cert.p12");
             }
         }
+
         public static void TriageRDCMan(Dictionary<string, string> MasterKeys, string computerName = "", bool unprotect = false)
         {
             // search for RDCMan.settings files, parsing any found with TriageRDCManFile()
