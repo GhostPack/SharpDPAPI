@@ -14,7 +14,13 @@ namespace SharpDPAPI.Commands
 
             string server = "";
             string outFile = "";
+            bool noWrap = false;
 
+            if (arguments.ContainsKey("/nowrap"))
+            {
+                noWrap = true;
+            }
+            
             if (arguments.ContainsKey("/server"))
             {
                 server = arguments["/server"];
@@ -36,7 +42,7 @@ namespace SharpDPAPI.Commands
                 outFile = arguments["/file"];
             }
 
-            Backup.GetBackupKey(server, outFile);
+            Backup.GetBackupKey(server, outFile, noWrap);
         }
     }
 }

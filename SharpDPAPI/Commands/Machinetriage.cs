@@ -31,7 +31,7 @@ namespace SharpDPAPI.Commands
 
                 Triage.TriageSystemCreds(mappings);
                 Triage.TriageSystemVaults(mappings);
-                //Triage.TriageSystemCerts(mappings);
+                Triage.TriageSystemCerts(mappings);
             }
         }
     }

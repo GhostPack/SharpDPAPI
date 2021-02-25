@@ -14,6 +14,12 @@ namespace SharpChrome.Commands
 
             string server = "";
             string outFile = "";
+            bool noWrap = false;
+
+            if (arguments.ContainsKey("/nowrap"))
+            {
+                noWrap = true;
+            }
 
             if (arguments.ContainsKey("/server"))
             {
@@ -36,7 +42,7 @@ namespace SharpChrome.Commands
                 outFile = arguments["/file"];
             }
 
-            SharpDPAPI.Backup.GetBackupKey(server, outFile);
+            SharpDPAPI.Backup.GetBackupKey(server, outFile, noWrap);
         }
     }
 }

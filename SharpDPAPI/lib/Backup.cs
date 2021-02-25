@@ -7,7 +7,7 @@ namespace SharpDPAPI
 {
     public class Backup
     {
-        public static void GetBackupKey(string system, string outFile = "")
+        public static void GetBackupKey(string system, string outFile = "", bool noWrap = false)
         {
             // retrieves a DPAPI backup key from the given system (DC) specified
             //  saving the key to the specified output file
@@ -122,10 +122,17 @@ namespace SharpDPAPI
                     // base64 output
                     string base64Key = Convert.ToBase64String(backupKeyPVK);
 
-                    Console.WriteLine("[*] Key :");
-                    foreach (string line in Helpers.Split(base64Key, 80))
+                    if (noWrap)
                     {
-                        Console.WriteLine("          {0}", line);
+                        Console.WriteLine($"[*] Key                              : {base64Key}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("[*] Key :");
+                        foreach (string line in Helpers.Split(base64Key, 80))
+                        {
+                            Console.WriteLine("          {0}", line);
+                        }
                     }
                 }
                 else

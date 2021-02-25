@@ -466,6 +466,63 @@ namespace SharpDPAPI
             IntPtr hKey
         );
 
+        
+        // for RSA key conversion
+        [DllImport("Ncrypt.dll", SetLastError = true, ExactSpelling = true)]
+        public static extern uint NCryptOpenStorageProvider(
+            out IntPtr hProvider,
+            [MarshalAs(UnmanagedType.LPWStr)] string szProviderName,
+            int flags
+        );
+
+        [DllImport("Ncrypt.dll", CharSet = CharSet.Unicode)]
+        public static extern uint NCryptImportKey(
+            IntPtr hProvider,
+            IntPtr hImportKey,
+            string pszBlobType,
+            IntPtr pParameterList,
+            [Out] out IntPtr phKey,
+            [MarshalAs(UnmanagedType.LPArray)] byte[] pbData,
+            int cbData,
+            int dwFlags
+        );
+
+        [DllImport("Ncrypt.dll", CharSet = CharSet.Unicode)]
+        internal static extern uint NCryptExportKey(
+            IntPtr hKey,
+            IntPtr hExportKey,
+            string pszBlobType,
+            IntPtr pParameterList,
+            byte[] pbOutput,
+            int cbOutput,
+            [Out] out int pcbResult,
+            int dwFlags
+        );
+
+        [DllImport("Ncrypt.dll", CharSet = CharSet.Unicode)]
+        public static extern uint NCryptSetProperty(
+            IntPtr Object,
+            string pszProperty,
+            [MarshalAs(UnmanagedType.LPArray)] byte[] pbInput,
+            int cbInput,
+            int dwFlags
+        );
+
+
+        [DllImport("Ncrypt.dll", SetLastError = true, ExactSpelling = true)]
+        public static extern uint NCryptFinalizeKey(
+            IntPtr hKey,
+            int dwFlags
+        );
+
+        [DllImport("Ncrypt.dll", SetLastError = true, ExactSpelling = true)]
+        public static extern uint NCryptFreeObject(
+            IntPtr hObject
+        );
+
+
+        [DllImport("kernel32.dll")]
+        public static extern uint GetLastError();
 
         [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
         [return: MarshalAsAttribute(UnmanagedType.Bool)]

@@ -5,12 +5,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.10.0] - 2021-02-25
+
+### Added
+* **SharpDPAPI** project
+    * CNG private key decryption support \m/
+    * Additional CAPI/CNG cert search locations
+    * `/nowrap` flag to the `backupkey` command
+
+### Fixed
+* **SharpDPAPI** project
+    * Bug where some extracted key components ending in 00 caused error cases
+
+### Changed
+* **SharpDPAPI** project
+    * Only decrypted private keys with certs present displayed by default, the `/showall` flag for `certificates` will display all decrypted results
+    * Combined `machinecerts` into `certificates /machine`
+    * Corrected method for SHA1 MS hash computation fuckery with entropy (thanks @gentilkiwi)
+    * Re-added certificate triage to `triage` and `machinetriage`
+
+
 ## [1.9.2] - 2021-01-04
 
 ### Added
 * **SharpDPAPI** project
     * /target option for machinecertificates
-    * more certification information on extraction (including Enhanced Key Usages)
+    * more certificate information on extraction (including Enhanced Key Usages)
 
 ### Fixed
 * **SharpDPAPI** project

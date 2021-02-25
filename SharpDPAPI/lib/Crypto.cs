@@ -44,7 +44,6 @@ namespace SharpDPAPI
 
             // reference: https://docs.microsoft.com/en-us/windows/desktop/seccrypto/alg-id
 
-
             switch (algCrypt)
             {
                 case 26115: // 26115 == CALG_3DES
@@ -95,27 +94,35 @@ namespace SharpDPAPI
             }
         }
 
-        public static byte[] DeriveKey(byte[] keyBytes, byte[] saltBytes, int algHash)
+        public static byte[] DeriveKey(byte[] keyBytes, byte[] saltBytes, int algHash, byte[] entropy = null)
         {
             // derives a dpapi session key using Microsoft crypto "magic"
 
-            // calculate the session key -> HMAC(salt) where the sha1(masterkey) is the key
+            //Console.WriteLine("[*] key       : {0}", BitConverter.ToString(keyBytes).Replace("-", ""));
+            //Console.WriteLine("[*] saltBytes : {0}", BitConverter.ToString(saltBytes).Replace("-", ""));
+            //Console.WriteLine("[*] entropy   : {0}", BitConverter.ToString(entropy).Replace("-", ""));
+            //Console.WriteLine("[*] algHash   : {0}", algHash);
 
             if (algHash == 32782)
             {
+                // calculate the session key -> HMAC(salt) where the sha1(masterkey) is the key
+
                 // 32782 == CALG_SHA_512
-                return HMACSha512(keyBytes, saltBytes);
+                // https://github.com/gentilkiwi/mimikatz/blob/fa42ed93aa4d5aa73825295e2ab757ac96005581/modules/kull_m_dpapi.c#L500
+                if (entropy != null)
+                {
+                    return HMACSha512(keyBytes, Helpers.Combine(saltBytes, entropy));
+                }
+                else
+                {
+                    return HMACSha512(keyBytes, saltBytes);
+                }
             } else if (algHash == 32772)
             {
                 // 32772 == CALG_SHA1
 
-                var hmac = new HMACSHA1(keyBytes);
-                var sessionKeyBytes = hmac.ComputeHash(saltBytes);
-
-
                 var ipad = new byte[64];
                 var opad = new byte[64];
-
 
                 // "...wut" - anyone reading Microsoft crypto
                 for (var i = 0; i < 64; i++)
@@ -126,24 +133,71 @@ namespace SharpDPAPI
 
                 for (var i = 0; i < keyBytes.Length; i++)
                 {
-                    ipad[i] ^= sessionKeyBytes[i];
-                    opad[i] ^= sessionKeyBytes[i];
+                    ipad[i] ^= keyBytes[i];
+                    opad[i] ^= keyBytes[i];
                 }
 
+                byte[] bufferI = Helpers.Combine(ipad, saltBytes);
+                
                 using (var sha1 = new SHA1Managed())
                 {
-                    var ipadSHA1bytes = sha1.ComputeHash(ipad);
-                    var opadSHA1bytes = sha1.ComputeHash(opad);
+                    var sha1BufferI = sha1.ComputeHash(bufferI);
+                    
+                    byte[] bufferO = Helpers.Combine(opad, sha1BufferI);
+                    if(entropy != null)
+                    {
+                        bufferO = Helpers.Combine(bufferO, entropy);
+                    }
 
-                    var combined = Helpers.Combine(ipadSHA1bytes, opadSHA1bytes);
-                    return combined;
+                    var sha1Buffer0 = sha1.ComputeHash(bufferO);
+                    
+                    return DeriveKeyRaw(sha1Buffer0, algHash);
                 }
+
+                return new byte[0];
             }
             else
             {
                 return new byte[0];
             }
         }
+
+
+        // adapted from https://github.com/gentilkiwi/mimikatz/blob/fa42ed93aa4d5aa73825295e2ab757ac96005581/modules/kull_m_crypto.c#L79-L101
+        public static byte[] DeriveKeyRaw(byte[] hashBytes, int algHash)
+        {
+            var ipad = new byte[64];
+            var opad = new byte[64];
+
+            // "...wut" - anyone reading Microsoft crypto
+            for (var i = 0; i < 64; i++)
+            {
+                ipad[i] = Convert.ToByte('6');
+                opad[i] = Convert.ToByte('\\');
+            }
+
+            for (var i = 0; i < hashBytes.Length; i++)
+            {
+                ipad[i] ^= hashBytes[i];
+                opad[i] ^= hashBytes[i];
+            }
+
+            if (algHash == 32772)
+            {
+                using (var sha1 = new SHA1Managed())
+                {
+                    var ipadSHA1bytes = sha1.ComputeHash(ipad);
+                    var ppadSHA1bytes = sha1.ComputeHash(opad);
+                    return Helpers.Combine(ipadSHA1bytes, ppadSHA1bytes);
+                }
+            }
+            else
+            {
+                Console.WriteLine("[X] Alghash not yet implemented: {0}", algHash);
+                return new byte[0];
+            }
+        }
+
 
         private static byte[] HMACSha512(byte[] keyBytes, byte[] saltBytes)
         {

@@ -61,7 +61,7 @@ namespace SharpDPAPI.Commands
             {
                 Triage.TriageUserCreds(masterkeys, server);
                 Triage.TriageUserVaults(masterkeys, server);
-                // Triage.TriageUserCerts(masterkeys, server);
+                
                 Console.WriteLine();
                 if (masterkeys.Count == 0)
                 {
@@ -72,6 +72,8 @@ namespace SharpDPAPI.Commands
                 {
                     Triage.TriageRDCMan(masterkeys, server, false);
                 }
+
+                Triage.TriageUserCerts(masterkeys, server, false);
             }
         }
     }

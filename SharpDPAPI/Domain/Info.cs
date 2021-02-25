@@ -19,7 +19,7 @@ namespace SharpDPAPI.Domain
 
 Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
 
-  SharpDPAPI backupkey [/server:SERVER.domain] [/file:key.pvk]
+  SharpDPAPI backupkey [/nowrap] [/server:SERVER.domain] [/file:key.pvk]
 
 
 The *search* comand will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs:
@@ -35,7 +35,6 @@ Machine/SYSTEM Triage:
     machinemasterkeys       -   triage all reachable machine masterkey files (elevates to SYSTEM to retrieve the DPAPI_SYSTEM LSA secret)
     machinecredentials      -   use 'machinemasterkeys' and then triage machine Credential files
     machinevaults           -   use 'machinemasterkeys' and then triage machine Vaults
-    machinecerts            -   use 'machinemasterkeys' and then triage machine certificate stores
     machinetriage           -   run the 'machinecredentials' and 'machinevaults' commands
 
 
@@ -50,7 +49,7 @@ User Triage:
         /server:SERVER          -   triage a remote server, assuming admin access
 
 
-    Arguments for the certificates|credentials|vaults|rdg|triage|blob|ps commands:
+    Arguments for the credentials|vaults|rdg|triage|blob|ps commands:
 
         Decryption:
             /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
@@ -66,6 +65,15 @@ User Triage:
                                     Note: must use with /pvk:KEY or /password:X
                                     Note: not applicable to 'blob' or 'ps' commands
 
+
+Certificate Triage:
+
+    Arguments for the 'certificates' command:
+        /showall                                        -   show all decrypted private key files, not just ones that are linked to installed certs (the default)
+        /machine                                        -   use the local machine store for certificate triage
+        /mkfile | /target                               -   for /machine triage
+        /pvk | /mkfile | /password | /server | /target  -   for user triage
+    
 
 Note: in most cases, just use *triage* if you're targeting user DPAPI secrets and *machinetriage* if you're going after SYSTEM DPAPI secrets.
       These functions wrap all the other applicable functions that can be automatically run.

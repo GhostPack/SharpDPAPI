@@ -40,7 +40,6 @@ namespace SharpDPAPI
                 {
                     // if we're triaging a folder of masterkeys
                     var files = Directory.GetFiles(target);
-
                     foreach (var file in files)
                     {
                         try
@@ -162,7 +161,7 @@ namespace SharpDPAPI
                             }
                             catch (Exception e)
                             {
-                                Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
+                                // Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
                             }
                         }
                     }
@@ -575,24 +574,24 @@ namespace SharpDPAPI
             Console.WriteLine();
         }
 
-        public static void TriageCertFile(string certFilePath, Dictionary<string, string> MasterKeys, bool machine = false)
+        public static void TriageCertFile(string certFilePath, Dictionary<string, string> MasterKeys, bool cng = false, bool alwaysShow = false)
         {
             // triage a certificate file
 
             var fileName = Path.GetFileName(certFilePath);
-            Console.WriteLine("\r\n  Certificate file      : {0}\r\n", fileName);
-            var certificateArray = File.ReadAllBytes(certFilePath);
+            var certificateBytes = File.ReadAllBytes(certFilePath);
+
             try
             {
-                ExportedCertificate cert = Dpapi.DescribeCertificate(certificateArray, MasterKeys, machine);
+                ExportedCertificate cert = Dpapi.DescribeCertificate(fileName, certificateBytes, MasterKeys, cng, alwaysShow);
 
                 if (cert.Thumbprint != "")
                 {
-                    Console.WriteLine("    Thumbprint: {0}", cert.Thumbprint);
-                    Console.WriteLine("    Issuer: {0}", cert.Issuer);
-                    Console.WriteLine("    Subject: {0}", cert.Subject);
-                    Console.WriteLine("    Valid Date: {0}", cert.ValidDate);
-                    Console.WriteLine("    Expiry Date: {0}", cert.ExpiryDate);
+                    Console.WriteLine("    Thumbprint       : {0}", cert.Thumbprint);
+                    Console.WriteLine("    Issuer           : {0}", cert.Issuer);
+                    Console.WriteLine("    Subject          : {0}", cert.Subject);
+                    Console.WriteLine("    Valid Date       : {0}", cert.ValidDate);
+                    Console.WriteLine("    Expiry Date      : {0}", cert.ExpiryDate);
                 }
 
                 if (cert.EKUs.Count > 0)
@@ -610,7 +609,7 @@ namespace SharpDPAPI
 
                 if (cert.PrivateKey != "")
                 {
-                    Console.WriteLine("    [*] Private key file {0} was recovered:\r\n", fileName);
+                    Console.WriteLine("\r\n    [*] Private key file {0} was recovered:\r\n", fileName);
                     Console.WriteLine(cert.PrivateKey);
                     Console.WriteLine(cert.PublicCertificate);
                     Console.WriteLine();
@@ -620,11 +619,9 @@ namespace SharpDPAPI
             {
                 Console.WriteLine("[X] Error triaging {0} : {1}", fileName, e.Message);
             }
-
-            Console.WriteLine();
         }
 
-        public static void TriageCertFolder(string folder, Dictionary<string, string> MasterKeys, bool machine = false)
+        public static void TriageCertFolder(string folder, Dictionary<string, string> MasterKeys, bool cng = false, bool alwaysShow = false)
         {
             // triage a specific certificate folder
             if (!Directory.Exists(folder))
@@ -633,7 +630,7 @@ namespace SharpDPAPI
             var systemFiles = Directory.GetFiles(folder);
             if ((systemFiles.Length != 0))
             {
-                Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
+                Console.WriteLine("\nFolder       : {0}\r\n", folder);
 
                 foreach (var file in systemFiles)
                 {
@@ -641,36 +638,51 @@ namespace SharpDPAPI
                         @"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")
                     )
                     {
-                        TriageCertFile(file, MasterKeys, machine);
+                        TriageCertFile(file, MasterKeys, cng, alwaysShow);
                     }
                 }
-
-                Console.WriteLine();
             }
         }
 
-        public static void TriageSystemCerts(Dictionary<string, string> MasterKeys)
+        public static void TriageSystemCerts(Dictionary<string, string> MasterKeys, bool showall = false)
         {
             if (!Helpers.IsHighIntegrity())
-                throw new PrivilegeNotHeldException("Must be elevated to triage SYSTEM credentials!\r\n");
+                throw new PrivilegeNotHeldException("Must be elevated to triage SYSTEM certificate private keys!\r\n");
 
             Console.WriteLine("\r\n[*] Triaging System Certificates\r\n");
 
-            // all the SYSTEM Credential file locations
-            string[] folderLocations =
+            // all the capi SYSTEM Credential file locations
+            //  TODO are ajy missing? https://docs.microsoft.com/en-us/windows/win32/seccng/key-storage-and-retrieval#key-directories-and-files
+            string[] capiFolderLocations =
             {
                 $"{Environment.GetEnvironmentVariable("SystemDrive")}\\ProgramData\\Microsoft\\Crypto\\RSA\\MachineKeys",
-                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA",
-                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\All Users\\Application Data\\Microsoft\\Crypto\\RSA\\MachineKeys"
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\S-1-5-18",
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\S-1-5-19",
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\S-1-5-20"
+                //$"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\All Users\\Application Data\\Microsoft\\Crypto\\RSA\\MachineKeys" // maps to ProgramData from what I can tell
             };
 
-            foreach (var location in folderLocations)
+            foreach (var location in capiFolderLocations)
             {
-                TriageCertFolder(location, MasterKeys, true);
+                TriageCertFolder(location, MasterKeys, false, showall);
+            }
+
+            // all the cng SYSTEM Credential file locations
+            //  TODO are any missing? https://docs.microsoft.com/en-us/windows/win32/seccng/key-storage-and-retrieval#key-directories-and-files
+            string[] cngFolderLocations =
+            {
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\ProgramData\\Microsoft\\Crypto\\Keys",
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\ProgramData\\Microsoft\\Crypto\\SystemKeys",
+                $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\Keys",
+            };
+
+            foreach (var location in cngFolderLocations)
+            {
+                TriageCertFolder(location, MasterKeys, true, showall);
             }
         }
 
-        public static void TriageUserCerts(Dictionary<string, string> MasterKeys, string computerName = "")
+        public static void TriageUserCerts(Dictionary<string, string> MasterKeys, string computerName = "", bool showall = false)
         {
             string[] userDirs;
             if (!String.IsNullOrEmpty(computerName))
@@ -705,19 +717,24 @@ namespace SharpDPAPI
                 if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
                     continue;
 
-                var userCertkeysBasePath = $"{dir}\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\";
+                var userCapiKeysBasePath = $"{dir}\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\";
 
-                if (!Directory.Exists(userCertkeysBasePath))
+                if (!Directory.Exists(userCapiKeysBasePath))
                     continue;
 
-                var certDictionary = new Dictionary<string, Tuple<string, string>>();
-                var directories = Directory.GetDirectories(userCertkeysBasePath);
+                var directories = Directory.GetDirectories(userCapiKeysBasePath);
 
                 foreach (var directory in directories)
                 {
-                    TriageCertFolder(directory, MasterKeys);
+                    TriageCertFolder(directory, MasterKeys, false, showall);
                 }
-                Console.WriteLine();
+
+                var userCngKeysPath = $"{dir}\\AppData\\Roaming\\Microsoft\\Crypto\\Keys\\";
+
+                if (!Directory.Exists(userCngKeysPath))
+                    continue;
+
+                TriageCertFolder(userCngKeysPath, MasterKeys, true, showall);
             }
         }
 

@@ -76,7 +76,6 @@ namespace SharpDPAPI
 
         public static byte[] TrimByte(byte[] input)
         {
-
             int byteCounter = input.Length - 1;
             while (input[byteCounter] == 0x00)
             {
@@ -173,6 +172,17 @@ namespace SharpDPAPI
             {
                 return "";
             }
+        }
+
+        public static byte[] PadToLength(byte[] input, int len = 64)
+        {
+            if (input.Length % len != 0)
+            {
+                byte[] pad = new byte[len - (input.Length % len)];
+                if (pad.Length > 0)
+                return Combine(pad, input);
+            }
+            return input;
         }
 
         public static byte[] Combine(byte[] first, byte[] second)
