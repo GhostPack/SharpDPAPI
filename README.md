@@ -36,6 +36,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       - [credentials](#credentials)
       - [vaults](#vaults)
       - [rdg](#rdg)
+      - [keepass](#keepass)
       - [certificates](#certificates)
       - [triage](#triage)
     - [Machine Triage](#machine-triage)
@@ -69,7 +70,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
-      v1.10.0
+      v1.11.0
 
 
 
@@ -105,7 +106,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /server:SERVER          -   triage a remote server, assuming admin access
 
 
-        Arguments for the credentials|vaults|rdg|triage|blob|ps commands:
+        Arguments for the credentials|vaults|rdg|keepass|triage|blob|ps commands:
 
             Decryption:
                 /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
@@ -619,6 +620,47 @@ Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
               Profile Name : Custom
                 UserName   : TESTLAB\dfm.a
                 Password   : Password123!
+
+
+#### keepass
+
+The **keepass** command will search for KeePass ProtectedUserKey.bin files for the current user (or if elevated, all users) and either a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), or d) a `/password:X` to decrypt any user masterkeys which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
+
+The `/unprotect` flag will use CryptUnprotectData() to decrypt the key bytes, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
+
+A specific ProtectedUserKey.bin file, .RDC file (or folder of .RDG files) can be specified with `/target:FILE` or `/target:C:\Folder\`. If a file is specified, {GUID}:SHA1 values (or `/unprotect`) are required, and if a folder is specified either a) {GUID}:SHA1 values must be supplied or b) the folder must contain DPAPI masterkeys and a /pvk domain backup key must be supplied.
+
+Decrypted key file bytes can be used with the [modified KeePass version in KeeThief](https://github.com/GhostPack/KeeThief/tree/master/KeePass-2.34-Source-Patched).
+
+Using `/unprotect` to decrypt any found key material:
+
+    C:\Temp> SharpDPAPI.exe  keepass /unprotect
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.10.0
+
+
+    [*] Action: KeePass Triage
+
+    [*] Using CryptUnprotectData() for decryption.
+
+    [*] Triaging KeePass ProtectedUserKey.bin files for current user
+
+        File             : C:\Users\harmj0y\AppData\Roaming\KeePass\ProtectedUserKey.bin
+        Accessed         : 3/1/2021 1:38:22 PM
+        Modified         : 1/4/2021 5:49:49 PM
+        guidMasterKey    : {dab90445-0a08-4b27-9110-b75d4a7894d0}
+        size             : 210
+        flags            : 0x0
+        algHash/algCrypt : 32772 (CALG_SHA) / 26115 (CALG_3DES)
+        description      :
+        Key Bytes        : 39 2E 63 EF 0E 37 E8 5C 34 ...
+
+
+    SharpDPAPI completed in 00:00:00.0566660
 
 
 #### certificates

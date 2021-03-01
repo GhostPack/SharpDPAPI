@@ -15,6 +15,7 @@ namespace SharpDPAPI.Commands
 
             byte[] blobBytes;
             bool unprotect = false;         // whether to force CryptUnprotectData()
+            byte[] entropy = null;
 
             if (arguments.ContainsKey("/unprotect"))
             {
@@ -73,11 +74,14 @@ namespace SharpDPAPI.Commands
                 }
             }
 
-            //byte[] decBytes = Dpapi.DescribeDPAPIBlob(blobBytes, masterkeys, "blob", unprotect);
+            if (arguments.ContainsKey("/entropy"))
+            {
+                entropy = Helpers.ConvertHexStringToByteArray(arguments["/entropy"]);
+            }
 
             if (blobBytes.Length > 0)
             {
-                byte[] decBytesRaw = Dpapi.DescribeDPAPIBlob(blobBytes, masterkeys, "blob", unprotect);
+                byte[] decBytesRaw = Dpapi.DescribeDPAPIBlob(blobBytes, masterkeys, "blob", unprotect, entropy);
 
                 if ((decBytesRaw != null) && (decBytesRaw.Length != 0))
                 {

@@ -49,7 +49,7 @@ User Triage:
         /server:SERVER          -   triage a remote server, assuming admin access
 
 
-    Arguments for the credentials|vaults|rdg|triage|blob|ps commands:
+    Arguments for the credentials|vaults|rdg|keepass|triage|blob|ps commands:
 
         Decryption:
             /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands

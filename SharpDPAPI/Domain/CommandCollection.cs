@@ -20,6 +20,7 @@ namespace SharpDPAPI.Domain
             _availableCommands.Add(Backupkey.CommandName, () => new Backupkey());
             _availableCommands.Add(Blob.CommandName, () => new Blob());
             _availableCommands.Add(Credentials.CommandName, () => new Credentials());
+            _availableCommands.Add(Keepass.CommandName, () => new Keepass());
             _availableCommands.Add(Machinecredentials.CommandName, () => new Machinecredentials());
             _availableCommands.Add(Machinemasterkeys.CommandName, () => new Machinemasterkeys());
             _availableCommands.Add(Machinetriage.CommandName, () => new Machinetriage());

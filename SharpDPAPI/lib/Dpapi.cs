@@ -45,7 +45,7 @@ namespace SharpDPAPI
             var descrlen = BitConverter.ToInt32(dpapiblob, offset);
 
             offset += 4;
-            var description = Encoding.Unicode.GetString(dpapiblob, offset, descrlen);
+            var description = Encoding.Unicode.GetString(dpapiblob, offset, descrlen).Replace("\0", string.Empty);
 
             offset += descrlen;
             var algCrypt = BitConverter.ToInt32(dpapiblob, offset);
@@ -94,7 +94,7 @@ namespace SharpDPAPI
                          
                         if (entropy != null)
                         {
-                            // for CNG
+                            // for CNG, we need a different padding mode
                             decrypted = Crypto.DecryptBlob(cipherText, finalKeyBytes, algCrypt, PaddingMode.PKCS7);
                         }
                         else {
@@ -261,7 +261,7 @@ namespace SharpDPAPI
             var description = new byte[descrLen];
 
             Array.Copy(blobBytes, offset, description, 0, descrLen);
-            var descriptionString = Encoding.Unicode.GetString(description, 0, description.Length);
+            var descriptionString = Encoding.Unicode.GetString(description, 0, description.Length).Replace("\0", string.Empty); ;
 
             offset += description.Length;
             offset += (int)dwPublicPropertiesLen;
@@ -321,7 +321,7 @@ namespace SharpDPAPI
             var descriptionGUID = new byte[descrLen];
 
             Array.Copy(blobBytes, offset, descriptionGUID, 0, descrLen);
-            var descriptionString = Encoding.UTF8.GetString(descriptionGUID, 0, descriptionGUID.Length);
+            var descriptionString = Encoding.UTF8.GetString(descriptionGUID, 0, descriptionGUID.Length).Replace("\0", string.Empty); ;
 
             offset += descriptionGUID.Length;
             var crc = new byte[hashLen];
@@ -849,20 +849,21 @@ namespace SharpDPAPI
             return masterkeys;
         }
 
-        public static byte[] DescribeDPAPIBlob(byte[] blobBytes, Dictionary<string, string> MasterKeys, string blobType = "credential", bool unprotect = false)
+
+        public static byte[] DescribeDPAPIBlob(byte[] blobBytes, Dictionary<string, string> MasterKeys, string blobType = "credential", bool unprotect = false, byte[] entropy = null)
         {
             // parses a DPAPI credential or vault policy blob, also returning the decrypted blob plaintext
 
             // credentialBytes  ->  byte array of the credential file
             // MasterKeys       ->  dictionary of GUID:Sha1(MasterKey) mappings for decryption
-            // blobType         ->  "credential", vault "policy", "blob", "rdg", or "chrome"
+            // blobType         ->  "credential", vault "policy", "blob", "rdg", "keepass", or "chrome"
 
             var offset = 0;
             if (blobType.Equals("credential"))
             {
                 offset = 36;
             }
-            else if (blobType.Equals("policy") || blobType.Equals("blob") || blobType.Equals("rdg") || blobType.Equals("chrome"))
+            else if (blobType.Equals("policy") || blobType.Equals("blob") || blobType.Equals("rdg") || blobType.Equals("chrome") || blobType.Equals("keepass"))
             {
                 offset = 24;
             }
@@ -940,10 +941,9 @@ namespace SharpDPAPI
             var dataBytes = new byte[dataLen];
             Array.Copy(blobBytes, offset, dataBytes, 0, dataLen);
 
-            if ((blobType.Equals("rdg") || blobType.Equals("blob") || blobType.Equals("chrome")) && unprotect)
+            if ((blobType.Equals("rdg") || blobType.Equals("blob") || blobType.Equals("chrome") || blobType.Equals("keepass")) && unprotect)
             {
                 // use CryptUnprotectData()
-                var entropy = new byte[0];
                 try
                 {
                     var decBytes = ProtectedData.Unprotect(blobBytes, entropy, DataProtectionScope.CurrentUser);
@@ -966,7 +966,7 @@ namespace SharpDPAPI
                         var keyBytes = Helpers.StringToByteArray(MasterKeys[guidString].ToString());
 
                         // derive the session key
-                        var derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash);
+                        var derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash, entropy);
                         var finalKeyBytes = new byte[algCryptLen / 8];
                         Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
 
@@ -993,7 +993,7 @@ namespace SharpDPAPI
                         var keyBytes = Helpers.StringToByteArray(MasterKeys[guidString].ToString());
 
                         // derive the session key
-                        var derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash);
+                        var derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash, entropy);
                         var finalKeyBytes = new byte[algCryptLen / 8];
                         Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
 
@@ -1040,6 +1040,7 @@ namespace SharpDPAPI
 
             return new byte[0];
         }
+
 
         public static ArrayList DescribeVaultPolicy(byte[] policyBytes, Dictionary<string, string> MasterKeys)
         {
@@ -1723,6 +1724,7 @@ namespace SharpDPAPI
 
             return masterKeySubBytes;
         }
+        
         public static byte[] CalculateKeys(string password, string directory, bool domain)
         {
             var usersid = Path.GetFileName(directory).TrimEnd(Path.DirectorySeparatorChar);
