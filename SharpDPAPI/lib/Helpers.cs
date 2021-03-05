@@ -377,6 +377,26 @@ namespace SharpDPAPI
             return masterkeys;
         }
 
+
+        public static List<string> GetUserFolders()
+        {
+            string usersFolder = String.Format("{0}\\Users\\", Environment.GetEnvironmentVariable("SystemDrive"));
+            
+            List<string> userFolderPaths = new List<string>();
+
+            string[] dirs = Directory.GetDirectories(usersFolder);
+            
+            foreach (string dir in dirs)
+            {
+                if (!(dir.EndsWith("Public") || dir.EndsWith("Default") || dir.EndsWith("Default User") || dir.EndsWith("All Users")))
+                {
+                    userFolderPaths.Add(dir);
+                }
+            }
+
+            return userFolderPaths;
+        }
+
         public static bool GetSystem()
         {
             // helper to elevate to SYSTEM via token impersonation

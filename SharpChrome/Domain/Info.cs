@@ -18,7 +18,7 @@ namespace SharpChrome.Domain
             string usage = @"
 Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
 
-  SharpChrome backupkey [/server:SERVER.domain] [/file:key.pvk]
+  SharpChrome backupkey [/nowrap] [/server:SERVER.domain] [/file:key.pvk]
 
 
 Global arguments for the 'cookies', 'logins', and 'statekeys' commands:
@@ -34,6 +34,7 @@ Global arguments for the 'cookies', 'logins', and 'statekeys' commands:
     
     Targeting:
         /target:FILE        -   triage a specific 'Cookies', 'Login Data', or 'Local State' file location
+        /target:C:\Users\X\ -   triage a specific user folder for any specified command
         /server:SERVER      -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
         /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'edge'/'brave'
     

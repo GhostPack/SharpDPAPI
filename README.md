@@ -29,7 +29,6 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
     - [Operational Usage](#operational-usage)
       - [SharpDPAPI](#sharpdpapi-1)
       - [SharpChrome](#sharpchrome)
-    - [Cobalt Strike Usage](#cobalt-strike-usage)
   - [SharpDPAPI Commands](#sharpdpapi-commands)
     - [User Triage](#user-triage)
       - [masterkeys](#masterkeys)
@@ -164,6 +163,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
 
         Targeting:
             /target:FILE        -   triage a specific 'Cookies', 'Login Data', or 'Local State' file location
+            /target:C:\Users\X\ -   triage a specific user folder for any specified command
             /server:SERVER      -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
             /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'edge'
 
@@ -205,21 +205,14 @@ SharpChrome is a Chrome-specific implementation of SharpDPAPI capable of **cooki
 
 Since Chrome Cookies/Login Data are saved without CRYPTPROTECT_SYSTEM, CryptUnprotectData() is back on the table. If SharpChrome is run from an unelevated contect, it will attempt to decrypt any logins/cookies for the current user using CryptUnprotectData(). A `/pvk:[BASE64|file.pvk]`, {GUID}:SHA1 lookup table, `/password:X`, or `/mkfile:FILE` of {GUID}:SHA1 values can also be used to decrypt values. Also, the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) used (with a few modifications) supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199), meaning that Chrome does not have to be closed/target files do not have to be copied to another location.
 
-If Chrome is version 80+, an AES state key is stored in *AppData\Local\Google\Chrome\User Data\Local State* - this key is protected with DPAPI, so we can use CryptUnprotectData()/pvk/masterkey lookup tables to decrypt it. This AES key is then used to protect new cookie and login data entries. This is also the process when `/browser:edge` is specified, for newer Chromium-based Edge browser triage.
+If Chrome is version 80+, an AES state key is stored in *AppData\Local\Google\Chrome\User Data\Local State* - this key is protected with DPAPI, so we can use CryptUnprotectData()/pvk/masterkey lookup tables to decrypt it. This AES key is then used to protect new cookie and login data entries. This is also the process when `/browser:edge` or `/browser:brave` is specified, for newer Chromium-based Edge browser triage.
 
 By default, cookies and logins are displayed as a csv - this can be changed with `/format:table` for table output, and `/format:json` for cookies specifically. The json option outputs cookies in a json format that can be imported into the [EditThisCookie](https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg?hl=en) Chrome extension for easy reuse.
 
 The **cookies** command also has `/cookie:REGEX` and `/url:REGEX` arguments to only return cookie names or urls matching the supplied regex. This is useful with `/format:json` to easily clone access to specific sites.
 
-### Cobalt Strike Usage
+Specific cookies/logins/statekey files can be specified with `/target:X`, and a user folder can be specified with `/target:C:\Users\USER\` for any triage command.
 
-SharpDPAPI has an Aggressor script (**SharpDPAPI.cna**) that automates the usage of SharpDPAPI through Cobalt Strike. Before usage, replace `$SharpDPAPI::AssemblyPath` in the .cna with the location of your compiled SharpDPAPI assembly.
-
-Loading **SharpDPAPI.cna** will register a new **sharpDPAPI** Beacon command. If **beacon> sharpDPAPI -dump** is run, the current Beacon will execute `sekurlsa::dpapi` Mimikatz command to extract any DPAPI keys from LSASS (assuming elevation) followed by `dpapi::cache` to display the {GUID}:SHA1 mappings. The decrypted master key SHA1s are stored in the credential store.
-
-Running **beacon> sharpDPAPI** will execute SharpDPAPI with the `triage` command with any GUID:SHA1 masterkey mappings extracted for that host. This allows for effective triage of all Credentials and Vaults on a host _for any currently logged in users_.
-
-_TODO: implement machine key triage functions in SharpDPAPI.cna_
 
 ## SharpDPAPI Commands
 

@@ -150,24 +150,26 @@ namespace SharpChrome.Commands
                     {
                         Console.WriteLine("[*] Target 'Cookies' File: {0}\r\n", target);
                     }
-
                     Chrome.ParseChromeCookies(masterkeys, target, displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire, stateKeyBytes, quiet);
+                }
+                else if (Directory.Exists(target) && target.ToLower().Contains("users"))
+                {
+                    Chrome.TriageChromeCookies(masterkeys, server, target, displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire, stateKey, browser, quiet);
                 }
                 else
                 {
-                    Console.WriteLine("\r\n[X] '{0}' is not a valid file.", target);
+                    Console.WriteLine("\r\n[X] '{0}' is not a valid file or user directory.", target);
                 }
             }
             else
             {
-                if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk") && !arguments.ContainsKey("/password") && !quiet)
+                if (arguments.ContainsKey("/server") && (masterkeys.Count == 0))
                 {
-                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' or '/password:X' !");
+                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...', '/password:X' , or masterkey specification !");
                 }
                 else
                 {
-                    // last "true" -> indicates we want to triage Edge
-                    Chrome.TriageChromeCookies(masterkeys, server, displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire, stateKey, browser, quiet);
+                    Chrome.TriageChromeCookies(masterkeys, server, "", displayFormat, showAll, unprotect, cookieRegex, urlRegex, setneverexpire, stateKey, browser, quiet);
                 }
             }
         }

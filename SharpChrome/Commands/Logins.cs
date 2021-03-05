@@ -19,6 +19,7 @@ namespace SharpChrome.Commands
             bool quiet = false;             // don't display headers/logos/etc. (for csv/json output)
             string stateKey = "";           // decrypted AES statekey to use for cookie decryption
             string browser = "chrome";      // alternate Chromiun browser to specify, currently supported: "chrome", "edge", "brave"
+            string target = "";             // target file/user folder to triage
 
 
             if (arguments.ContainsKey("/quiet"))
@@ -106,7 +107,7 @@ namespace SharpChrome.Commands
 
             if (arguments.ContainsKey("/target"))
             {
-                string target = arguments["/target"].Trim('"').Trim('\'');
+                target = arguments["/target"].Trim('"').Trim('\'');
                 byte[] stateKeyBytes = null;
 
                 if (!String.IsNullOrEmpty(stateKey))
@@ -122,21 +123,23 @@ namespace SharpChrome.Commands
                     }
                     Chrome.ParseChromeLogins(masterkeys, target, displayFormat, showAll, unprotect, stateKeyBytes, quiet);
                 }
+                else if(Directory.Exists(target) && target.ToLower().Contains("users"))
+                {
+                    Chrome.TriageChromeLogins(masterkeys, server, target, displayFormat, showAll, unprotect, stateKey, browser, quiet);
+                }
                 else
                 {
-                    Console.WriteLine("\r\n[X] '{0}' is not a valid file.", target);
+                    Console.WriteLine("\r\n[X] '{0}' is not a valid file or user directory.", target);
                 }
             }
             else
             {
-                if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk") && !arguments.ContainsKey("/password"))
+                if (arguments.ContainsKey("/server") && (masterkeys.Count == 0))
                 {
-                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' or '/password:X' !");
+                    Console.WriteLine("[!] Warning: the '/server:X' argument must be used with '/pvk:BASE64...', '/password:X' , or masterkey specification for successful decryption!");
                 }
-                else
-                {
-                    Chrome.TriageChromeLogins(masterkeys, server, displayFormat, showAll, unprotect, stateKey, browser, quiet);
-                }
+                
+                Chrome.TriageChromeLogins(masterkeys, server, target, displayFormat, showAll, unprotect, stateKey, browser, quiet);
             }
         }
     }

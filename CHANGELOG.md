@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.11.1] - 2021-03-05
+
+### Fixed
+* **SharpChrome** project
+    * Chrome statekey usage bug when triaging multiple users
+
+### Changed
+* **SharpChrome** project
+    * Default cookie/logins/statekeys triage behavior is now to triage the current user if elevated, unless pvk/password/masterkeys specified
+    * `/target:X` can now be a `C:\Users\USER\` folder for any specified triage
+    * Added Brave statekey triage to `statekeys`
+    * Cleaned up Chromium triage code
+* Removed out of date SharpDPAPI.cna aggressor script
+
+
 ## [1.11.0] - 2021-03-01
 
 ### Added

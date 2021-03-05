@@ -11,7 +11,7 @@ namespace SharpChrome.Commands
         public void Execute(Dictionary<string, string> arguments)
         {
             Console.WriteLine("\r\n[*] Action: Chromium Statekey Extraction\r\n");
-            arguments.Remove("cookies");
+            arguments.Remove("statekeys");
 
             string server = "";             // used for remote server specification
             bool unprotect = false;         // whether to force CryptUnprotectData()
@@ -67,21 +67,22 @@ namespace SharpChrome.Commands
                 {
                     Chrome.TriageStateKeys(masterkeys, server, unprotect, target);
                 }
+                else if (Directory.Exists(target) && target.ToLower().Contains("users"))
+                {
+                    Chrome.TriageStateKeys(masterkeys, server, unprotect, "", target);
+                }
                 else
                 {
-                    Console.WriteLine("\r\n[X] '{0}' is not a valid file.", target);
+                    Console.WriteLine("\r\n[X] '{0}' is not a valid file or user directory.", target);
                 }
             }
             else
             {
-                if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk") && !arguments.ContainsKey("/password"))
+                if (arguments.ContainsKey("/server") && (masterkeys.Count == 0))
                 {
-                    Console.WriteLine("[X] The '/server:X' argument must be used with '/pvk:BASE64...' or '/password:X' !");
+                    Console.WriteLine("[!] Warning: the '/server:X' argument must be used with '/pvk:BASE64...', '/password:X' , or masterkey specification for successful decryption!");
                 }
-                else
-                {
-                    Chrome.TriageStateKeys(masterkeys, server, unprotect);
-                }
+                Chrome.TriageStateKeys(masterkeys, server, unprotect);
             }
         }
     }
