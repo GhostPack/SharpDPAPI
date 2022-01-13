@@ -242,16 +242,28 @@ namespace SharpChrome
                 if (browser.ToLower() == "chrome")
                 {
                     cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", userDirectory);
+                    if(!File.Exists(cookiePath))
+                    {
+                        cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Network\\Cookies", userDirectory);
+                    }
                     aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", userDirectory);
                 }
                 else if (browser.ToLower() == "edge")
                 {
                     cookiePath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies", userDirectory);
+                    if (!File.Exists(cookiePath))
+                    {
+                        cookiePath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Network\\Cookies", userDirectory);
+                    }
                     aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State", userDirectory);
                 }
                 else if (browser.ToLower() == "brave")
                 {
                     cookiePath = String.Format("{0}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Cookies", userDirectory);
+                    if (!File.Exists(cookiePath))
+                    {
+                        cookiePath = String.Format("{0}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Network\\Cookies", userDirectory);
+                    }
                     aesStateKeyPath = String.Format("{0}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State", userDirectory);
                 }
                 else
