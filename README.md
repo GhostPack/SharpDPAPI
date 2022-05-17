@@ -49,6 +49,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       - [blob](#blob)
       - [backupkey](#backupkey)
       - [search](#search)
+      - [sccm](#sccm)
   - [SharpChrome Commands](#sharpchrome-commands)
     - [logins](#logins)
     - [cookies](#cookies)
@@ -1222,7 +1223,7 @@ Retrieve the DPAPI backup key for the specified DC, outputting the backup key to
 
 
 #### search
-The **search** comand will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs. Usage:
+The **search** command will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs. Usage:
 ```
 SharpDPAPI.exe search /type:registry [/path:HKLM\path\to\key] [/showErrors]
 SharpDPAPI.exe search /type:folder /path:C:\path\to\folder [/maxBytes:<numOfBytes>] [/showErrors]
@@ -1243,6 +1244,8 @@ When searching a file or folder, specify a path with `/path:C:\Path\to\file\or\f
 
 When searching a base64 blob, specify the base64-encoded bytes to scan with the `/base64:<base64 str>` parameter.
 
+#### SCCM
+If elevated on a machine that is an SCCM client, if the SCCM environment is configured with a Network Access Account (NAA), the system master key-protected DPAPI blobs containing the NAA credentials can be retrieved via WMI; The **SCCM** command will query the blobs via WMI, retrieve the system master keys, and decrypt the blobs.
 
 ## SharpChrome Commands
 
