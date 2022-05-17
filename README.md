@@ -1225,7 +1225,7 @@ Retrieve the DPAPI backup key for the specified DC, outputting the backup key to
 
 
 #### search
-The **search** comand will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs. Usage:
+The **search** command will search for potential DPAPI blobs in the registry, files, folders, and base64 blobs. Usage:
 ```
 SharpDPAPI.exe search /type:registry [/path:HKLM\path\to\key] [/showErrors]
 SharpDPAPI.exe search /type:folder /path:C:\path\to\folder [/maxBytes:<numOfBytes>] [/showErrors]
@@ -1245,6 +1245,9 @@ When searching the registry with no other arguments, the command will recursivel
 When searching a file or folder, specify a path with `/path:C:\Path\to\file\or\folder` and optionally use `/maxBytes:<int>` to specify the number of bytes to read from each file (default: 1024 bytes). The command will read the bytes from the beginning of the file and search for DPAPI blobs. Use `/showErrors` to display an errors that occur during enumeration.
 
 When searching a base64 blob, specify the base64-encoded bytes to scan with the `/base64:<base64 str>` parameter.
+
+#### sccm
+The **SCCM** command will query for Network Access Account (NAA) credentials via WMI. If they exist, the blob wills will be decrypted using the relevant system master key.
 
 
 ## SharpChrome Commands
