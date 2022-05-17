@@ -49,6 +49,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       - [blob](#blob)
       - [backupkey](#backupkey)
       - [search](#search)
+      - [sccm](#sccm)
   - [SharpChrome Commands](#sharpchrome-commands)
     - [logins](#logins)
     - [cookies](#cookies)
@@ -196,6 +197,8 @@ If DA privileges have not been achieved, using Mimikatz' `sekurlsa::dpapi` comma
 For decrypting RDG/RDCMan.settings files with the [rdg](#rdg) command, the `/unprotect` flag will use CryptUnprotectData() to decrypt any saved RDP passwords, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
 
 For machine-specific DPAPI triage, the `machinemasterkeys|machinecredentials|machinevaults|machinetriage` commands will do the machine equivalent of user DPAPI triage. If in an elevated context (that is, you need local administrative rights), SharpDPAPI will elevate to SYSTEM privileges to retrieve the "DPAPI_SYSTEM" LSA secret, which is then used to decrypt any discovered machine DPAPI masterkeys. These keys are then used as lookup tables for machine credentials/vaults/etc.
+
+If elevated on a machine that is an SCCM client, if the SCCM environment is configured with a Network Access Account (NAA), the system master key-protected DPAPI blobs containing the NAA credentials can be retrieved via WMI; The [sccm](#sccm) command will query the blobs via WMI, retrieve the system master keys, and decrypt the blobs.
 
 For more offensive DPAPI information, [check here](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/).
 
