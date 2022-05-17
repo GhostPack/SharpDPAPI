@@ -198,8 +198,6 @@ For decrypting RDG/RDCMan.settings files with the [rdg](#rdg) command, the `/unp
 
 For machine-specific DPAPI triage, the `machinemasterkeys|machinecredentials|machinevaults|machinetriage` commands will do the machine equivalent of user DPAPI triage. If in an elevated context (that is, you need local administrative rights), SharpDPAPI will elevate to SYSTEM privileges to retrieve the "DPAPI_SYSTEM" LSA secret, which is then used to decrypt any discovered machine DPAPI masterkeys. These keys are then used as lookup tables for machine credentials/vaults/etc.
 
-If elevated on a machine that is an SCCM client, if the SCCM environment is configured with a Network Access Account (NAA), the system master key-protected DPAPI blobs containing the NAA credentials can be retrieved via WMI; The [sccm](#sccm) command will query the blobs via WMI, retrieve the system master keys, and decrypt the blobs.
-
 For more offensive DPAPI information, [check here](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/).
 
 #### SharpChrome
@@ -1246,9 +1244,8 @@ When searching a file or folder, specify a path with `/path:C:\Path\to\file\or\f
 
 When searching a base64 blob, specify the base64-encoded bytes to scan with the `/base64:<base64 str>` parameter.
 
-#### sccm
-The **SCCM** command will query for Network Access Account (NAA) credentials via WMI. If they exist, the blob wills will be decrypted using the relevant system master key.
-
+#### SCCM
+If elevated on a machine that is an SCCM client, if the SCCM environment is configured with a Network Access Account (NAA), the system master key-protected DPAPI blobs containing the NAA credentials can be retrieved via WMI; The **SCCM** command will query the blobs via WMI, retrieve the system master keys, and decrypt the blobs.
 
 ## SharpChrome Commands
 
