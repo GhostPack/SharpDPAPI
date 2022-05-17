@@ -32,6 +32,7 @@ namespace SharpDPAPI.Domain
             _availableCommands.Add(Vaults.CommandName, () => new Vaults());
             _availableCommands.Add(Certificate.CommandName, () => new Certificate());
             _availableCommands.Add(Search.CommandName, () => new Search());
+            _availableCommands.Add(SCCM.CommandName, () => new SCCM());
         }
 
         public bool ExecuteCommand(string commandName, Dictionary<string, string> arguments)
