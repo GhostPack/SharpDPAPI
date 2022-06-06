@@ -1269,7 +1269,7 @@ The **cookies** command will search for Chrome 'Cookies' files and decrypt cooki
 
 Cookie files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
-A specific Cookies file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` is also supplied. If triaging newer Chrome/Edge instances, a `/statekey:X` AES state key can be specified.
+A specific Cookies file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` or `/password` is also supplied. If triaging newer Chrome/Edge instances, a `/statekey:X` AES state key can be specified.
 
 By default, cookies are displayed in a csv format. This can be modified with `/format:table` for table output, or `/format:json` for output importable by [EditThisCookie](https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg?hl=en). Also, by default only non-expired cookie value entries are displayed, but all values can be displayed with `/showall`.
 
