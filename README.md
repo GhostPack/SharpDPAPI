@@ -223,6 +223,8 @@ Specific cookies/logins/statekey files can be specified with `/target:X`, and a 
 
 The **masterkeys** command will search for any readable user masterkey files and decrypt them using a supplied domain DPAPI backup key. It will return a set of masterkey {GUID}:SHA1 mappings.
 
+`/password:X` can be used to decrypt a user's current masterkeys. If `/target` is also supplied with `/password`, the `/sid:X` full domain SID of the user also needs to be specified.
+
 The domain backup key can be in base64 form (`/pvk:BASE64...`) or file form (`/pvk:key.pvk`).
 
     C:\Temp>SharpDPAPI.exe masterkeys /pvk:key.pvk
@@ -1255,7 +1257,7 @@ The **logins** command will search for Chrome 'Login Data' files and decrypt the
 
 Login Data files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
-A specific Login Data file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` is also supplied. If triaging newer Chrome/Edge instances, a `/statekey:X` AES state key can be specified.
+A specific Login Data file can be specified with `/target:FILE`. A remote `/server:SERVER` can be specified if a `/pvk` or `/password` is also supplied. If triaging newer Chrome/Edge instances, a `/statekey:X` AES state key can be specified.
 
 By default, logins are displayed in a csv format. This can be modified with `/format:table` for table output. Also, by default only non-null password value entries are displayed, but all values can be displayed with `/showall`.
 

@@ -1725,9 +1725,18 @@ namespace SharpDPAPI
             return masterKeySubBytes;
         }
         
-        public static byte[] CalculateKeys(string password, string directory, bool domain)
+        public static byte[] CalculateKeys(string password, string directory, bool domain, string userSID = "")
         {
-            var usersid = Path.GetFileName(directory).TrimEnd(Path.DirectorySeparatorChar);
+            var usersid = "";
+
+            if (String.IsNullOrEmpty(directory))
+            {
+                usersid = Path.GetFileName(directory).TrimEnd(Path.DirectorySeparatorChar);
+            }
+            else
+            {
+                usersid = userSID;
+            }
 
             var utf16pass = Encoding.Unicode.GetBytes(password);
             var utf16sid = Encoding.Unicode.GetBytes(usersid);

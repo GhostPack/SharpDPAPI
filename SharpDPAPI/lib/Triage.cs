@@ -10,21 +10,20 @@ namespace SharpDPAPI
 {
     public class Triage
     {
-        public static Dictionary<string, string> TriageUserMasterKeys(byte[] backupKeyBytes, bool show = false, string computerName = "", string password = "", string target = "")
+        public static Dictionary<string, string> TriageUserMasterKeys(byte[] backupKeyBytes, bool show = false, string computerName = "", string password = "", string target = "", string userSID = "")
         {
             // triage all *user* masterkeys we can find, decrypting if the backupkey is supplied
-
+            
             var mappings = new Dictionary<string, string>();
             var canAccess = false;
 
             if (!String.IsNullOrEmpty(target))
             {
                 // if we're targeting specific masterkey files
-
-                if (backupKeyBytes.Length == 0)
+                if (((backupKeyBytes == null) || (backupKeyBytes.Length == 0)) && String.IsNullOrEmpty(userSID))
                 {
                     // currently only backupkey is supported
-                    Console.WriteLine("[X] The masterkey '/target:X' option currently requires '/pvk:BASE64...'");
+                    Console.WriteLine("[X] The masterkey '/target:X' option currently requires '/pvk:BASE64...' or '/password:X'");
                     return mappings;
                 }
 
@@ -49,7 +48,16 @@ namespace SharpDPAPI
                             if (Helpers.IsGuid(f.Name))
                             {
                                 var masterKeyBytes = File.ReadAllBytes(file);
-                                plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
+                                if ((backupKeyBytes != null) && (backupKeyBytes.Length != 0))
+                                {
+                                    plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
+                                }
+                                else
+                                {
+                                    byte[] hmacBytes = Dpapi.CalculateKeys(password, "", true, userSID);
+                                    plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
+                                }
+
                                 mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
                             }
                         }
@@ -65,7 +73,15 @@ namespace SharpDPAPI
                     try
                     {
                         var masterKeyBytes = File.ReadAllBytes(target);
-                        plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
+                        if ((backupKeyBytes != null) && (backupKeyBytes.Length != 0))
+                        {
+                            plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
+                        }
+                        else
+                        {
+                            byte[] hmacBytes = Dpapi.CalculateKeys(password, "", true, userSID);
+                            plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
+                        }
                         mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
                     }
                     catch (Exception e)

@@ -51,6 +51,18 @@ namespace SharpDPAPI.Commands
                 {
                     mappings = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
                 }
+                else if (arguments.ContainsKey("/target"))
+                {
+                    if (!arguments.ContainsKey("/sid"))
+                    {
+                        Console.WriteLine("[X] When using /password:X with /target:X, a /sid:X (domain user SID) is required!");
+                        return;
+                    }
+                    else {
+                        Console.WriteLine("[*] Triaging masterkey target: {0}\r\n", arguments["/target"]);
+                        mappings = Triage.TriageUserMasterKeys(null, true, "", password, arguments["/target"], arguments["/sid"]);
+                    }
+                }
                 else
                 {
                     mappings = Triage.TriageUserMasterKeys(null, true, "", password);
