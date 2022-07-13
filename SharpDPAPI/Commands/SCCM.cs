@@ -142,7 +142,7 @@ namespace SharpDPAPI.Commands
                                 }
                             }
                         }
-                        Console.WriteLine("-----------------------------------");
+                        //Console.WriteLine("-----------------------------------");
                     }
                 }
             }
