@@ -16,7 +16,8 @@ namespace SharpDPAPI.Commands
             ManagementScope sccmConnection = new ManagementScope(path, connection);
             try
             {
-                Console.WriteLine($"[+] Connecting to {sccmConnection.Path}");
+                Console.WriteLine($"[*] Retrieving SCCM Network Access Account blobs via WMI");
+                Console.WriteLine($"[*]     Connecting to {sccmConnection.Path}");
                 sccmConnection.Connect();
             }
             catch (System.UnauthorizedAccessException unauthorizedErr)
@@ -87,16 +88,14 @@ namespace SharpDPAPI.Commands
 
                 if (dryRun)
                 {
-                    Console.WriteLine($"[+] WQL query: {query}");
+                    Console.WriteLine($"[*]     WQL query: {query}");
                 }
                 else
                 {
-                    Console.WriteLine($"[+] Executing WQL query: {query}");
+                    Console.WriteLine($"[*]     Executing WQL query: {query}");
                     ObjectQuery objQuery = new ObjectQuery(query);
                     ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, objQuery);
-                    Console.WriteLine("-----------------------------------");
-                    Console.WriteLine(wmiClass);
-                    Console.WriteLine("-----------------------------------");
+
                     foreach (ManagementObject queryObj in searcher.Get())
                     {
                         // Get lazy properties unless we're just counting instances
@@ -142,7 +141,6 @@ namespace SharpDPAPI.Commands
                                 }
                             }
                         }
-                        //Console.WriteLine("-----------------------------------");
                     }
                 }
             }
@@ -209,11 +207,11 @@ namespace SharpDPAPI.Commands
             }
         }
 
-        public static void LocalNetworkAccessAccountsWmi()
+        public static void LocalNetworkAccessAccountsWmi(Dictionary<string,string> mappings)
         {
             if (!Helpers.IsHighIntegrity())
             {
-                Console.WriteLine("[X] Must be elevated to triage SYSTEM DPAPI Credentials!");
+                Console.WriteLine("[X] Must be elevated to retrieve NAA blobs via WMI!");
             }
             else
             {
@@ -233,14 +231,9 @@ namespace SharpDPAPI.Commands
                             int length = (protectedUsernameBytes.Length + 16 - 1) / 16 * 16;
                             Array.Resize(ref protectedUsernameBytes, length);
 
-                            Dictionary<string, string> mappings = Triage.TriageSystemMasterKeys();
+                            //Dictionary<string, string> mappings = Triage.TriageSystemMasterKeys();
 
-                            Console.WriteLine("\r\n[*] SYSTEM master key cache:\r\n");
-                            foreach (KeyValuePair<string, string> kvp in mappings)
-                            {
-                                Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
-                            }
-                            Console.WriteLine();
+
 
                             try
                             {
@@ -275,7 +268,15 @@ namespace SharpDPAPI.Commands
             Console.WriteLine("\r\n[*] Action: SCCM Triage");
             arguments.Remove("SCCM");
 
-            LocalNetworkAccessAccountsWmi();
+            Dictionary<string, string> mappings = Triage.TriageSystemMasterKeys();
+            Console.WriteLine("\r\n[*] SYSTEM master key cache:\r\n");
+            foreach (KeyValuePair<string, string> kvp in mappings)
+            {
+                Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
+            }
+            Console.WriteLine();
+
+            LocalNetworkAccessAccountsWmi(mappings);
         }
     }
 }
