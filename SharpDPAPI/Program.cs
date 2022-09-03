@@ -73,7 +73,7 @@ namespace SharpDPAPI
                 return "Error parsing arguments: ${command}";
             }
 
-            var commandName = args.Length != 0 ? args[0] : "";
+            var commandName = args.Length != 0 ?  args[0].ToLower() : "";
 
             TextWriter realStdOut = Console.Out;
             TextWriter realStdErr = Console.Error;
@@ -108,7 +108,7 @@ namespace SharpDPAPI
                     return;
                 }
 
-                var commandName = args.Length != 0 ? args[0] : "";
+                var commandName = args.Length != 0 ? args[0].ToLower() : "";
 
                 if (parsed.Arguments.ContainsKey("/consoleoutfile"))
                 {

