@@ -116,23 +116,23 @@ namespace SharpChrome
 
         #region Functions
 
-        [DllImport(nameof(BCrypt), SetLastError = true, ExactSpelling = true)]
+        [DllImport("BCrypt", SetLastError = true, ExactSpelling = true)]
         public static extern uint BCryptDestroyKey(
             IntPtr hKey);
 
-        [DllImport(nameof(BCrypt), SetLastError = true, ExactSpelling = true)]
+        [DllImport("BCrypt", SetLastError = true, ExactSpelling = true)]
         public static extern uint BCryptCloseAlgorithmProvider(
             IntPtr algorithmHandle,
             BCryptCloseAlgorithmProviderFlags flags = BCryptCloseAlgorithmProviderFlags.None);
 
-        [DllImport(nameof(BCrypt), SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true)]
+        [DllImport("BCrypt", SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true)]
         public static extern uint BCryptOpenAlgorithmProvider(
             out SafeAlgorithmHandle phAlgorithm,
             string pszAlgId,
             string pszImplementation,
             BCryptOpenAlgorithmProviderFlags dwFlags);
 
-        [DllImport(nameof(BCrypt), SetLastError = true, ExactSpelling = true, CharSet = CharSet.Unicode)]
+        [DllImport("BCrypt", SetLastError = true, ExactSpelling = true, CharSet = CharSet.Unicode)]
         public static extern uint BCryptSetProperty(
             SafeHandle hObject,
             string pszProperty,
@@ -140,7 +140,7 @@ namespace SharpChrome
             int cbInput,
             BCryptSetPropertyFlags dwFlags = BCryptSetPropertyFlags.None);
 
-        [DllImport(nameof(BCrypt), SetLastError = true)]
+        [DllImport("BCrypt", SetLastError = true)]
         public static extern uint BCryptGenerateSymmetricKey(
             SafeAlgorithmHandle hAlgorithm,
             out SafeKeyHandle phKey,
@@ -150,7 +150,7 @@ namespace SharpChrome
             int cbSecret,
             BCryptGenerateSymmetricKeyFlags flags = BCryptGenerateSymmetricKeyFlags.None);
 
-        [DllImport(nameof(BCrypt), SetLastError = true)]
+        [DllImport("BCrypt", SetLastError = true)]
         public static unsafe extern uint BCryptDecrypt(
             SafeKeyHandle hKey,
             byte* pbInput,
