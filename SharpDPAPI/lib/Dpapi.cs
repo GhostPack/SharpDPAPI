@@ -1731,7 +1731,7 @@ namespace SharpDPAPI
         {
             var usersid = "";
 
-            if (String.IsNullOrEmpty(directory))
+            if (!String.IsNullOrEmpty(directory))
             {
                 usersid = Path.GetFileName(directory).TrimEnd(Path.DirectorySeparatorChar);
             }
@@ -2031,6 +2031,62 @@ namespace SharpDPAPI
                 return true;
             }
             return false;
+        }
+
+        public static string FormatHash(byte[] masterKeyBytes, string sid, int context = 3)
+        {
+            var mkBytes = GetMasterKey(masterKeyBytes);
+
+            var offset = 4;
+            var salt = new byte[16];
+            Array.Copy(mkBytes, 4, salt, 0, 16);
+            offset += 16;
+
+            var rounds = BitConverter.ToInt32(mkBytes, offset);
+            offset += 4;
+
+            var algHash = BitConverter.ToInt32(mkBytes, offset);
+            offset += 4;
+
+            var algCrypt = BitConverter.ToInt32(mkBytes, offset);
+            offset += 4;
+
+            var encData = new byte[mkBytes.Length - offset];
+            Array.Copy(mkBytes, offset, encData, 0, encData.Length);
+
+            int version = 0;
+            string cipherAlgo;
+            string hmacAlgo;
+
+            switch (algCrypt)
+            {
+                case 26128 when (algHash == 32782 || algHash == 32772):
+                    version = 2;
+                    cipherAlgo = "aes256";
+                    hmacAlgo = "sha512";
+                    break;
+                case 26115 when (algHash == 32777):
+                    version = 1;
+                    cipherAlgo = "des3";
+                    hmacAlgo = "sha1";
+                    break;
+                default:
+                    throw new Exception($"Alg crypt '{algCrypt} / 0x{algCrypt:X8}' not currently supported!");
+            }
+
+            string hash = string.Format(
+                "$DPAPImk${0}*{1}*{2}*{3}*{4}*{5}*{6}*{7}*{8}",
+                version,
+                context,
+                sid,
+                cipherAlgo,
+                hmacAlgo,
+                rounds,
+                Helpers.ByteArrayToString(salt),
+                encData.Length * 2,
+                Helpers.ByteArrayToString(encData));
+            
+            return hash;
         }
     }
 }
