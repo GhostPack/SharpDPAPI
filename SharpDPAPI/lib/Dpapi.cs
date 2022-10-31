@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -2033,9 +2034,13 @@ namespace SharpDPAPI
             return false;
         }
 
-        public static string FormatHash(byte[] masterKeyBytes, string sid, int context = 3)
+        public static KeyValuePair<string, string> FormatHash(byte[] masterKeyBytes, string sid, int context = 3)
         {
+            if (string.IsNullOrEmpty(sid) || masterKeyBytes == null)
+                return default;
+
             var mkBytes = GetMasterKey(masterKeyBytes);
+            var guidMasterKey = $"{{{Encoding.Unicode.GetString(masterKeyBytes, 12, 72)}}}";
 
             var offset = 4;
             var salt = new byte[16];
@@ -2085,8 +2090,66 @@ namespace SharpDPAPI
                 Helpers.ByteArrayToString(salt),
                 encData.Length * 2,
                 Helpers.ByteArrayToString(encData));
-            
-            return hash;
+
+            return new KeyValuePair<string, string>(guidMasterKey, hash);
+        }
+
+        public static string GetPreferredKey(string file)
+        {
+            byte[] guidBytes = new byte[16];
+            using (BinaryReader reader = new BinaryReader(new FileStream(file, FileMode.Open)))
+            {
+                reader.Read(guidBytes, 0, 16);
+            }
+            return new Guid(guidBytes).ToString();
+        }
+
+        public static string GetSidFromBKFile(string bkFile)
+        {
+            string sid = string.Empty;
+            byte[] bkBytes = File.ReadAllBytes(bkFile);
+
+            if (bkBytes.Length > 28)
+            {
+                try
+                {
+                    SecurityIdentifier sidObj = new SecurityIdentifier(bkBytes, 0x3c);
+                    sid = sidObj.Value;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[X] Failed to parse BK file: {ex.Message}");
+                }
+            }
+            return sid;
+        }
+
+        public static string ExtractSidFromPath(string masterKeyPath)
+        {
+            string sid = String.Empty;
+
+            // First check if there is a BK file we can get the SID from
+            foreach (string file in Directory.GetFiles(Path.GetDirectoryName(masterKeyPath), "*", SearchOption.TopDirectoryOnly))
+            {
+                if (Path.GetFileName(file).StartsWith("BK-"))
+                {
+                    sid = GetSidFromBKFile(file);
+                    if (!String.IsNullOrEmpty(sid))
+                    {
+                        //Console.WriteLine($"[*] Found SID from BK file: {sid}");
+                        break;
+                    }
+                }
+            }
+
+            // Fall back to directory name
+            if (String.IsNullOrEmpty(sid) && Regex.IsMatch(Path.GetDirectoryName(masterKeyPath),
+                @"S-\d-\d+-(\d+-){1,14}\d+$", RegexOptions.IgnoreCase))
+            {
+                sid = Path.GetFileName(Path.GetDirectoryName(masterKeyPath));
+                //Console.WriteLine($"[*] Found SID from path: {sid}");
+            }
+            return sid;
         }
     }
 }
