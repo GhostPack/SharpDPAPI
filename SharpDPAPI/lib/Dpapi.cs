@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -1891,7 +1892,7 @@ namespace SharpDPAPI
                 // Support for 32777(CALG_HMAC) / 26115(CALG_3DES)
                 case 26115 when (algHash == 32777 || algHash == 32772):
                     {
-                        var masterKeySha1 = DecryptTripleDESHmac(derivedPreKey, encData);
+                        var masterKeySha1 = DecryptTripleDESHmac(shaBytes, derivedPreKey, encData);
                         var masterKeyStr = BitConverter.ToString(masterKeySha1).Replace("-", "");
 
                         return new KeyValuePair<string, string>(guidMasterKey, masterKeyStr);
@@ -1943,7 +1944,6 @@ namespace SharpDPAPI
 
         private static byte[] DecryptAes256HmacSha512(byte[] shaBytes, byte[] final, byte[] encData)
         {
-            var HMACLen = (new HMACSHA512()).HashSize / 8;
             var aesCryptoProvider = new AesManaged();
 
             var ivBytes = new byte[16];
@@ -1959,46 +1959,21 @@ namespace SharpDPAPI
 
             // decrypt the encrypted data using the Pbkdf2-derived key
             var plaintextBytes = aesCryptoProvider.CreateDecryptor().TransformFinalBlock(encData, 0, encData.Length);
-
-            var outLen = plaintextBytes.Length;
-            var outputLen = outLen - 16 - HMACLen;
-
-            var masterKeyFull = new byte[HMACLen];
-
-            // outLen - outputLen == 80 in this case
-            Array.Copy(plaintextBytes, outLen - outputLen, masterKeyFull, 0, masterKeyFull.Length);
+            var masterKeyFull = new byte[64];
+            Array.Copy(plaintextBytes, plaintextBytes.Length - masterKeyFull.Length, masterKeyFull, 0, masterKeyFull.Length);
 
             using (var sha1 = new SHA1Managed())
             {
                 var masterKeySha1 = sha1.ComputeHash(masterKeyFull);
 
-                // we're HMAC'ing the first 16 bytes of the decrypted buffer with the shaBytes as the key
-                var plaintextCryptBuffer = new byte[16];
-                Array.Copy(plaintextBytes, plaintextCryptBuffer, 16);
-                var hmac1 = new HMACSHA512(shaBytes);
-                var round1Hmac = hmac1.ComputeHash(plaintextCryptBuffer);
+                if (!IsValidHMAC(plaintextBytes, masterKeyFull, shaBytes, typeof(HMACSHA512)))
+                    throw new Exception("HMAC integrity check failed!");
 
-                // round 2
-                var round2buffer = new byte[outputLen];
-                Array.Copy(plaintextBytes, outLen - outputLen, round2buffer, 0, outputLen);
-                var hmac2 = new HMACSHA512(round1Hmac);
-                var round2Hmac = hmac2.ComputeHash(round2buffer);
-
-                // compare the second HMAC value to the original plaintextBytes, starting at index 16
-                var comparison = new byte[64];
-                Array.Copy(plaintextBytes, 16, comparison, 0, comparison.Length);
-
-                if (comparison.SequenceEqual(round2Hmac))
-                {
-                    return masterKeySha1;
-                }
-
-                throw new Exception("HMAC integrity check failed!");
-
+                return masterKeySha1;
             }
         }
 
-        private static byte[] DecryptTripleDESHmac(byte[] final, byte[] encData)
+        private static byte[] DecryptTripleDESHmac(byte[] shaBytes, byte[] final, byte[] encData)
         {
             var desCryptoProvider = new TripleDESCryptoServiceProvider();
 
@@ -2014,14 +1989,45 @@ namespace SharpDPAPI
             desCryptoProvider.Padding = PaddingMode.Zeros;
 
             var plaintextBytes = desCryptoProvider.CreateDecryptor().TransformFinalBlock(encData, 0, encData.Length);
-            var decryptedkey = new byte[64];
+            var masterKeyFull = new byte[64];
+            Array.Copy(plaintextBytes, plaintextBytes.Length - masterKeyFull.Length, masterKeyFull, 0, masterKeyFull.Length);
 
-            Array.Copy(plaintextBytes, 40, decryptedkey, 0, 64);
             using (var sha1 = new SHA1Managed())
             {
-                var masterKeySha1 = sha1.ComputeHash(decryptedkey);
+                var masterKeySha1 = sha1.ComputeHash(masterKeyFull);
+
+                if (!IsValidHMAC(plaintextBytes, masterKeyFull, shaBytes, typeof(HMACSHA1)))
+                    throw new Exception("HMAC integrity check failed!");
+
                 return masterKeySha1;
             }
+        }
+
+        private static bool IsValidHMAC(byte[] plaintextBytes, byte[] masterKeyFull, byte[] shaBytes, Type HMACType)
+        {
+            var obj = (HMAC)Activator.CreateInstance(HMACType);
+            var HMACLen = obj.HashSize / 8;
+
+            // we're HMAC'ing the first 16 bytes of the decrypted buffer with the shaBytes as the key
+            var hmacSalt = new byte[16];
+            Array.Copy(plaintextBytes, hmacSalt, 16);
+
+            var hmac = new byte[HMACLen];
+            Array.Copy(plaintextBytes, 16, hmac, 0, hmac.Length);
+
+            var hmac1 = (HMAC)Activator.CreateInstance(HMACType, shaBytes);
+            var round1Hmac = hmac1.ComputeHash(hmacSalt);
+
+            // round 2
+            var hmac2 = (HMAC)Activator.CreateInstance(HMACType, round1Hmac);
+            var round2Hmac = hmac2.ComputeHash(masterKeyFull);
+
+            // compare the second HMAC value to the original plaintextBytes, starting at index 16
+            if (hmac.SequenceEqual(round2Hmac))
+            {
+                return true;
+            }
+            return false;
         }
     }
 }
