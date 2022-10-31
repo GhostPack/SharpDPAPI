@@ -8,6 +8,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SharpDPAPI
 {
@@ -1766,7 +1767,9 @@ namespace SharpDPAPI
             else
             {
                 //Calculate NTLM from user password. Kerberos's RC4_HMAC key is the NTLM hash
-                var rc4Hash = Crypto.KerberosPasswordHash(Interop.KERB_ETYPE.rc4_hmac, password);
+                //Skip NTLM hashing if the password is in NTLM format
+                string rc4Hash = Regex.IsMatch(password, "^[a-f0-9]{32}$", RegexOptions.IgnoreCase) ? password : 
+                    Crypto.KerberosPasswordHash(Interop.KERB_ETYPE.rc4_hmac, password);
 
                 var ntlm = Helpers.ConvertHexStringToByteArray(rc4Hash);
 
