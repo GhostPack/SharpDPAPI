@@ -287,7 +287,7 @@ namespace SharpDPAPI.Commands
                 fileData = File.ReadAllText(pathToFile);
             }
 
-            Regex regexData = new Regex(@"CCM_NetworkAccessAccount.*<PolicySecret Version=""1""><!\[CDATA\[(.*)\]\]><\/PolicySecret>.*<PolicySecret Version=""1""><!\[CDATA\[(.*)\]\]><\/PolicySecret>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            Regex regexData = new Regex(@"CCM_NetworkAccessAccount.*<PolicySecret Version=""1""><!\[CDATA\[(.*?)\]\]><\/PolicySecret>.*<PolicySecret Version=""1""><!\[CDATA\[(.*?)\]\]><\/PolicySecret>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
             var matchesData = regexData.Matches(fileData);
 
             if (matchesData.Count <= 0)
