@@ -32,6 +32,7 @@ namespace SharpDPAPI.Commands
                 Triage.TriageSystemCreds(mappings);
                 Triage.TriageSystemVaults(mappings);
                 Triage.TriageSystemCerts(mappings);
+                SCCM.LocalNetworkAccessAccountsWmi(mappings);
             }
         }
     }

