@@ -175,7 +175,7 @@ namespace SharpDPAPI
 
                                 mappings.Add(plaintextMasterKey.Key, plaintextMasterKey.Value);
                             }
-                            catch (Exception e)
+                            catch (Exception)
                             {
                                 // Console.WriteLine("[X] Error triaging {0} : {1}", file, e.Message);
                             }

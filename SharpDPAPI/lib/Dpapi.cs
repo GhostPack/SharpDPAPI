@@ -101,7 +101,7 @@ namespace SharpDPAPI
                             decrypted = Crypto.DecryptBlob(cipherText, finalKeyBytes, algCrypt);
                         }
                     }
-                    catch (Exception e)
+                    catch (Exception)
                     {
                         Console.WriteLine($"    [!] {fileName} masterkey needed: {strmkguidProvider}");
                     }
@@ -134,7 +134,7 @@ namespace SharpDPAPI
                             Console.WriteLine("    [X] Error decrypting blob: {0}", ex);
                         }
                     }
-                    catch (Exception e)
+                    catch (Exception)
                     {
                         Console.WriteLine($"    [!] {fileName} masterkey needed: {strmkguidProvider}");
                     }
@@ -369,7 +369,6 @@ namespace SharpDPAPI
                         len = siPrivateKeyLen;
                     }
 
-                    var offset2 = 0;
                     var dpapiblob = new byte[len];
                     Array.Copy(blobBytes, offset, dpapiblob, 0, len);
 

@@ -181,15 +181,14 @@ namespace SharpDPAPI.Commands
                             byte[] decBytes = new byte[finalIndex + 1];
                             Array.Copy(decBytesRaw, 0, decBytes, 0, finalIndex);
                             data = Encoding.Unicode.GetString(decBytes);
-                            return data;
                         }
                         else
                         {
                             data = Encoding.ASCII.GetString(decBytesRaw);
-                            return data;
                         }
 
                         Console.WriteLine("    dec(blob)        : {0}", data);
+                        return data;
                     }
                     else
                     {

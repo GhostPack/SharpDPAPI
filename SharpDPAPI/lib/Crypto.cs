@@ -153,8 +153,6 @@ namespace SharpDPAPI
                     
                     return DeriveKeyRaw(sha1Buffer0, algHash);
                 }
-
-                return new byte[0];
             }
             else
             {

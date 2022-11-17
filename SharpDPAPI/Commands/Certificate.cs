@@ -14,10 +14,9 @@ namespace SharpDPAPI.Commands
             Console.WriteLine("\r\n[*] Action: Certificate Triage");
             arguments.Remove("certificates");
 
-            string server = "";         // used for remote server specification
+            string server;              // used for remote server specification
             bool cng = false;           // used for CNG certs
             bool showall = false;       // used for CNG certs
-            bool machineStore = false;  // use the machine store instead of the personal certificate store
 
             // {GUID}:SHA1 keys are the only ones that don't start with /
             Dictionary<string, string> masterkeys = new Dictionary<string, string>();
@@ -42,9 +41,6 @@ namespace SharpDPAPI.Commands
             if (arguments.ContainsKey("/machine"))
             {
                 // machine certificate triage
-
-                machineStore = true;
-
                 if (arguments.ContainsKey("/mkfile"))
                 {
                     masterkeys = SharpDPAPI.Helpers.ParseMasterKeyFile(arguments["/mkfile"]);

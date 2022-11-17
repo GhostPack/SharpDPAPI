@@ -359,9 +359,6 @@ namespace SharpChrome
 
             foreach (string userDirectory in userDirectories)
             {
-                var loginDataPath = "";
-                var aesStateKeyPath = "";
-
                 string[] aesKeyPaths = new string[]
                 {
                     $"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State",
