@@ -68,9 +68,34 @@ namespace SharpDPAPI.Commands
                     mappings = Triage.TriageUserMasterKeys(null, true, "", password);
                 }
             }
+            else if (arguments.ContainsKey("/hashes"))
+            {
+                Console.WriteLine("[*] Will dump user masterkey hashes\r\n");
+                if (arguments.ContainsKey("/server"))
+                {
+                    mappings = Triage.TriageUserMasterKeys(null, true, arguments["/server"], "", "", "", true);
+                }
+                else if (arguments.ContainsKey("/target"))
+                {
+                    if (!arguments.ContainsKey("/sid"))
+                    {
+                        Console.WriteLine("[X] When dumping hashes with /target:X, a /sid:X (domain user SID) is required!");
+                        return;
+                    }
+                    else
+                    {
+                        Console.WriteLine("[*] Triaging masterkey target: {0}\r\n", arguments["/target"]);
+                        mappings = Triage.TriageUserMasterKeys(null, true, "", "", arguments["/target"], arguments["/sid"], true);
+                    }
+                }
+                else
+                {
+                    mappings = Triage.TriageUserMasterKeys(null, true, "", "", "", "", true);
+                }
+            }
             else
             {
-                Console.WriteLine("[X] A /pvk:BASE64 domain DPAPI backup key or /password:X must be supplied!");
+                Console.WriteLine("[X] A /pvk:BASE64 domain DPAPI backup key, /password:X or /hashes must be supplied!");
                 return;
             }
 
@@ -82,7 +107,8 @@ namespace SharpDPAPI.Commands
                 }
                 else
                 {
-                    Console.WriteLine("\r\n[*] User master key cache:\r\n");
+                    var message = arguments.ContainsKey("/hashes") ? "hashes" : "cache";
+                    Console.WriteLine("\r\n[*] User master key {0}:\r\n", message);
                     foreach (KeyValuePair<string, string> kvp in mappings)
                     {
                         Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);

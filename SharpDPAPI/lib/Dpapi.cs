@@ -2,11 +2,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Principal;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SharpDPAPI
 {
@@ -1728,7 +1731,7 @@ namespace SharpDPAPI
         {
             var usersid = "";
 
-            if (String.IsNullOrEmpty(directory))
+            if (!String.IsNullOrEmpty(directory))
             {
                 usersid = Path.GetFileName(directory).TrimEnd(Path.DirectorySeparatorChar);
             }
@@ -1764,7 +1767,9 @@ namespace SharpDPAPI
             else
             {
                 //Calculate NTLM from user password. Kerberos's RC4_HMAC key is the NTLM hash
-                var rc4Hash = Crypto.KerberosPasswordHash(Interop.KERB_ETYPE.rc4_hmac, password);
+                //Skip NTLM hashing if the password is in NTLM format
+                string rc4Hash = Regex.IsMatch(password, "^[a-f0-9]{32}$", RegexOptions.IgnoreCase) ? password : 
+                    Crypto.KerberosPasswordHash(Interop.KERB_ETYPE.rc4_hmac, password);
 
                 var ntlm = Helpers.ConvertHexStringToByteArray(rc4Hash);
 
@@ -1890,7 +1895,7 @@ namespace SharpDPAPI
                 // Support for 32777(CALG_HMAC) / 26115(CALG_3DES)
                 case 26115 when (algHash == 32777 || algHash == 32772):
                     {
-                        var masterKeySha1 = DecryptTripleDESHmac(derivedPreKey, encData);
+                        var masterKeySha1 = DecryptTripleDESHmac(shaBytes, derivedPreKey, encData);
                         var masterKeyStr = BitConverter.ToString(masterKeySha1).Replace("-", "");
 
                         return new KeyValuePair<string, string>(guidMasterKey, masterKeyStr);
@@ -1942,7 +1947,6 @@ namespace SharpDPAPI
 
         private static byte[] DecryptAes256HmacSha512(byte[] shaBytes, byte[] final, byte[] encData)
         {
-            var HMACLen = (new HMACSHA512()).HashSize / 8;
             var aesCryptoProvider = new AesManaged();
 
             var ivBytes = new byte[16];
@@ -1958,46 +1962,21 @@ namespace SharpDPAPI
 
             // decrypt the encrypted data using the Pbkdf2-derived key
             var plaintextBytes = aesCryptoProvider.CreateDecryptor().TransformFinalBlock(encData, 0, encData.Length);
-
-            var outLen = plaintextBytes.Length;
-            var outputLen = outLen - 16 - HMACLen;
-
-            var masterKeyFull = new byte[HMACLen];
-
-            // outLen - outputLen == 80 in this case
-            Array.Copy(plaintextBytes, outLen - outputLen, masterKeyFull, 0, masterKeyFull.Length);
+            var masterKeyFull = new byte[64];
+            Array.Copy(plaintextBytes, plaintextBytes.Length - masterKeyFull.Length, masterKeyFull, 0, masterKeyFull.Length);
 
             using (var sha1 = new SHA1Managed())
             {
                 var masterKeySha1 = sha1.ComputeHash(masterKeyFull);
 
-                // we're HMAC'ing the first 16 bytes of the decrypted buffer with the shaBytes as the key
-                var plaintextCryptBuffer = new byte[16];
-                Array.Copy(plaintextBytes, plaintextCryptBuffer, 16);
-                var hmac1 = new HMACSHA512(shaBytes);
-                var round1Hmac = hmac1.ComputeHash(plaintextCryptBuffer);
+                if (!IsValidHMAC(plaintextBytes, masterKeyFull, shaBytes, typeof(HMACSHA512)))
+                    throw new Exception("HMAC integrity check failed!");
 
-                // round 2
-                var round2buffer = new byte[outputLen];
-                Array.Copy(plaintextBytes, outLen - outputLen, round2buffer, 0, outputLen);
-                var hmac2 = new HMACSHA512(round1Hmac);
-                var round2Hmac = hmac2.ComputeHash(round2buffer);
-
-                // compare the second HMAC value to the original plaintextBytes, starting at index 16
-                var comparison = new byte[64];
-                Array.Copy(plaintextBytes, 16, comparison, 0, comparison.Length);
-
-                if (comparison.SequenceEqual(round2Hmac))
-                {
-                    return masterKeySha1;
-                }
-
-                throw new Exception("HMAC integrity check failed!");
-
+                return masterKeySha1;
             }
         }
 
-        private static byte[] DecryptTripleDESHmac(byte[] final, byte[] encData)
+        private static byte[] DecryptTripleDESHmac(byte[] shaBytes, byte[] final, byte[] encData)
         {
             var desCryptoProvider = new TripleDESCryptoServiceProvider();
 
@@ -2013,14 +1992,163 @@ namespace SharpDPAPI
             desCryptoProvider.Padding = PaddingMode.Zeros;
 
             var plaintextBytes = desCryptoProvider.CreateDecryptor().TransformFinalBlock(encData, 0, encData.Length);
-            var decryptedkey = new byte[64];
+            var masterKeyFull = new byte[64];
+            Array.Copy(plaintextBytes, plaintextBytes.Length - masterKeyFull.Length, masterKeyFull, 0, masterKeyFull.Length);
 
-            Array.Copy(plaintextBytes, 40, decryptedkey, 0, 64);
             using (var sha1 = new SHA1Managed())
             {
-                var masterKeySha1 = sha1.ComputeHash(decryptedkey);
+                var masterKeySha1 = sha1.ComputeHash(masterKeyFull);
+
+                if (!IsValidHMAC(plaintextBytes, masterKeyFull, shaBytes, typeof(HMACSHA1)))
+                    throw new Exception("HMAC integrity check failed!");
+
                 return masterKeySha1;
             }
+        }
+
+        private static bool IsValidHMAC(byte[] plaintextBytes, byte[] masterKeyFull, byte[] shaBytes, Type HMACType)
+        {
+            var obj = (HMAC)Activator.CreateInstance(HMACType);
+            var HMACLen = obj.HashSize / 8;
+
+            // we're HMAC'ing the first 16 bytes of the decrypted buffer with the shaBytes as the key
+            var hmacSalt = new byte[16];
+            Array.Copy(plaintextBytes, hmacSalt, 16);
+
+            var hmac = new byte[HMACLen];
+            Array.Copy(plaintextBytes, 16, hmac, 0, hmac.Length);
+
+            var hmac1 = (HMAC)Activator.CreateInstance(HMACType, shaBytes);
+            var round1Hmac = hmac1.ComputeHash(hmacSalt);
+
+            // round 2
+            var hmac2 = (HMAC)Activator.CreateInstance(HMACType, round1Hmac);
+            var round2Hmac = hmac2.ComputeHash(masterKeyFull);
+
+            // compare the second HMAC value to the original plaintextBytes, starting at index 16
+            if (hmac.SequenceEqual(round2Hmac))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public static KeyValuePair<string, string> FormatHash(byte[] masterKeyBytes, string sid, int context = 3)
+        {
+            if (string.IsNullOrEmpty(sid) || masterKeyBytes == null)
+                return default;
+
+            var mkBytes = GetMasterKey(masterKeyBytes);
+            var guidMasterKey = $"{{{Encoding.Unicode.GetString(masterKeyBytes, 12, 72)}}}";
+
+            var offset = 4;
+            var salt = new byte[16];
+            Array.Copy(mkBytes, 4, salt, 0, 16);
+            offset += 16;
+
+            var rounds = BitConverter.ToInt32(mkBytes, offset);
+            offset += 4;
+
+            var algHash = BitConverter.ToInt32(mkBytes, offset);
+            offset += 4;
+
+            var algCrypt = BitConverter.ToInt32(mkBytes, offset);
+            offset += 4;
+
+            var encData = new byte[mkBytes.Length - offset];
+            Array.Copy(mkBytes, offset, encData, 0, encData.Length);
+
+            int version = 0;
+            string cipherAlgo;
+            string hmacAlgo;
+
+            switch (algCrypt)
+            {
+                case 26128 when (algHash == 32782 || algHash == 32772):
+                    version = 2;
+                    cipherAlgo = "aes256";
+                    hmacAlgo = "sha512";
+                    break;
+                case 26115 when (algHash == 32777):
+                    version = 1;
+                    cipherAlgo = "des3";
+                    hmacAlgo = "sha1";
+                    break;
+                default:
+                    throw new Exception($"Alg crypt '{algCrypt} / 0x{algCrypt:X8}' not currently supported!");
+            }
+
+            string hash = string.Format(
+                "$DPAPImk${0}*{1}*{2}*{3}*{4}*{5}*{6}*{7}*{8}",
+                version,
+                context,
+                sid,
+                cipherAlgo,
+                hmacAlgo,
+                rounds,
+                Helpers.ByteArrayToString(salt),
+                encData.Length * 2,
+                Helpers.ByteArrayToString(encData));
+
+            return new KeyValuePair<string, string>(guidMasterKey, hash);
+        }
+
+        public static string GetPreferredKey(string file)
+        {
+            byte[] guidBytes = new byte[16];
+            using (BinaryReader reader = new BinaryReader(new FileStream(file, FileMode.Open)))
+            {
+                reader.Read(guidBytes, 0, 16);
+            }
+            return new Guid(guidBytes).ToString();
+        }
+
+        public static string GetSidFromBKFile(string bkFile)
+        {
+            string sid = string.Empty;
+            byte[] bkBytes = File.ReadAllBytes(bkFile);
+
+            if (bkBytes.Length > 28)
+            {
+                try
+                {
+                    SecurityIdentifier sidObj = new SecurityIdentifier(bkBytes, 0x3c);
+                    sid = sidObj.Value;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[X] Failed to parse BK file: {ex.Message}");
+                }
+            }
+            return sid;
+        }
+
+        public static string ExtractSidFromPath(string masterKeyPath)
+        {
+            string sid = String.Empty;
+
+            // First check if there is a BK file we can get the SID from
+            foreach (string file in Directory.GetFiles(Path.GetDirectoryName(masterKeyPath), "*", SearchOption.TopDirectoryOnly))
+            {
+                if (Path.GetFileName(file).StartsWith("BK-"))
+                {
+                    sid = GetSidFromBKFile(file);
+                    if (!String.IsNullOrEmpty(sid))
+                    {
+                        //Console.WriteLine($"[*] Found SID from BK file: {sid}");
+                        break;
+                    }
+                }
+            }
+
+            // Fall back to directory name
+            if (String.IsNullOrEmpty(sid) && Regex.IsMatch(Path.GetDirectoryName(masterKeyPath),
+                @"S-\d-\d+-(\d+-){1,14}\d+$", RegexOptions.IgnoreCase))
+            {
+                sid = Path.GetFileName(Path.GetDirectoryName(masterKeyPath));
+                //Console.WriteLine($"[*] Found SID from path: {sid}");
+            }
+            return sid;
         }
     }
 }

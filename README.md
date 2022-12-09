@@ -70,7 +70,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
-      v1.11.0
+      v1.11.3
 
 
 
@@ -102,7 +102,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /target:FILE/folder     -   triage a specific masterkey, or a folder full of masterkeys (otherwise triage local masterkeys)
             /pvk:BASE64...          -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
             /pvk:key.pvk            -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
-            /password:X             -   first decrypt the current user's masterkeys using a plaintext password (works remotely)
+            /password:X             -   first decrypt the current user's masterkeys using a plaintext password or NTLM hash (works remotely)
             /server:SERVER          -   triage a remote server, assuming admin access
 
 
@@ -110,7 +110,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
 
             Decryption:
                 /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
-                /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
+                /password:X         -   first decrypt the current user's masterkeys using a plaintext password or NTLM hash. Works with any function, as well as remotely.
                 GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
                 /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
                 /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
@@ -223,7 +223,7 @@ Specific cookies/logins/statekey files can be specified with `/target:X`, and a 
 
 The **masterkeys** command will search for any readable user masterkey files and decrypt them using a supplied domain DPAPI backup key. It will return a set of masterkey {GUID}:SHA1 mappings.
 
-`/password:X` can be used to decrypt a user's current masterkeys. If `/target` is also supplied with `/password`, the `/sid:X` full domain SID of the user also needs to be specified.
+`/password:X` can be used to decrypt a user's current masterkeys. Note that for domain-joined machines, the password can be supplied in either plaintext or NTLM format. If `/target` is also supplied with `/password`, the `/sid:X` full domain SID of the user also needs to be specified.
 
 The domain backup key can be in base64 form (`/pvk:BASE64...`) or file form (`/pvk:key.pvk`).
 
@@ -246,6 +246,38 @@ The domain backup key can be in base64 form (`/pvk:BASE64...`) or file form (`/p
 
     {42e95117-ff5f-40fa-a6fc-87584758a479}:4C802894C566B235B7F34B011316...(snip)...
     ...(snip)...
+
+
+If no `/pasword` or `/pvk` is specified, you may pass the `/hashes` flag to dump the master key hashes in John/Hashcat format. In this mode, the hashes are printed in the format of `{GUID}:DPAPImk`.
+
+The `Preferred` key is also parsed in order to highlight the current preferred master key, so that effort is not spent cracking older keys.
+
+    C:\Temp>SharpDPAPI.exe masterkeys /hashes
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.11.3
+    
+    
+    [*] Action: User DPAPI Masterkey File Triage
+    
+    [*] Will dump user masterkey hashes
+    
+    [*] Found MasterKey : C:\Users\admin\AppData\Roaming\Microsoft\Protect\S-1-5-21-1473254003-2681465353-4059813368-1000\28678d89-678a-404f-a197-f4186315c4fa
+    [*] Found MasterKey : C:\Users\harmj0y\AppData\Roaming\Microsoft\Protect\S-1-5-21-883232822-274137685-4173207997-1111\3858b304-37e5-48aa-afa2-87aced61921a
+    ...(snip)...
+
+    [*] Preferred master keys:
+    
+    C:\Users\admin\AppData\Roaming\Microsoft\Protect\S-1-5-21-1473254003-2681465353-4059813368-1000\28678d89-678a-404f-a197-f4186315c4fa
+    C:\Users\harmj0y\AppData\Roaming\Microsoft\Protect\S-1-5-21-883232822-274137685-4173207997-1111\3858b304-37e5-48aa-afa2-87aced61921a
+
+
+    [*] User master key hashes:
+
+    {42e95117-ff5f-40fa-a6fc-87584758a479}:$DPAPImk$1*3*S-1-5-21-1473254003-2681465353-4059813368-1000*des3*sha1*18000*09c49e9af9...(snip)...
 
 
 #### credentials
