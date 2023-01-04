@@ -11,10 +11,9 @@ namespace SharpDPAPI
     public class Triage
     {
         public static Dictionary<string, string> TriageUserMasterKeys(byte[] backupKeyBytes, bool show = false, string computerName = "", 
-            string password = "", string target = "", string userSID = "", bool dumpHash = false)
+            string password = "", string target = "", string userSID = "", bool dumpHash = false, bool local = false)
         {
             // triage all *user* masterkeys we can find, decrypting if the backupkey is supplied
-            
             var mappings = new Dictionary<string, string>();
             var preferred = new Dictionary<string, string>();
             var canAccess = false;
@@ -90,7 +89,7 @@ namespace SharpDPAPI
                         }
                         else if (!String.IsNullOrEmpty(password))
                         {
-                            byte[] hmacBytes = Dpapi.CalculateKeys(password, "", true, userSID);
+                            byte[] hmacBytes = Dpapi.CalculateKeys(password, "", !local, userSID);
                             plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
                         }
                         else if (dumpHash)

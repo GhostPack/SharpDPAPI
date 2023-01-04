@@ -1747,44 +1747,38 @@ namespace SharpDPAPI
             utf16sid.CopyTo(utf16sidfinal, 0);
             utf16sidfinal[utf16sidfinal.Length - 2] = 0x00;
 
-            byte[] sha1bytes_password;
-            byte[] hmacbytes;
+            byte[] derived = null;
+            byte[] finalKey = null;
 
             if (!domain)
             {
-                //Calculate SHA1 from user password
-                using (var sha1 = new SHA1Managed())
+                if (Regex.IsMatch(password, "^[a-f0-9]{40}$", RegexOptions.IgnoreCase))
                 {
-                    sha1bytes_password = sha1.ComputeHash(utf16pass);
+                    // Pass-the-hash (skip initial SHA1 phase)
+                    // Note: SHA1 hash must be in format: SHA1(UTF16LE(password))
+                    // e.g. from mimikatz' sekurlsa::msv
+                    derived = Helpers.ConvertHexStringToByteArray(password);
                 }
-                var combined = Helpers.Combine(sha1bytes_password, utf16sidfinal);
-                using (var hmac = new HMACSHA1(sha1bytes_password))
+                else
                 {
-                    hmacbytes = hmac.ComputeHash(utf16sidfinal);
+                    //Calculate SHA1 from user password
+                    using (var sha1 = new SHA1Managed())
+                    {
+                        derived = sha1.ComputeHash(utf16pass);
+                    }
                 }
-                return hmacbytes;
             }
             else
             {
                 //Calculate NTLM from user password. Kerberos's RC4_HMAC key is the NTLM hash
                 //Skip NTLM hashing if the password is in NTLM format
-                string rc4Hash = Regex.IsMatch(password, "^[a-f0-9]{32}$", RegexOptions.IgnoreCase) ? password : 
+                string rc4Hash = Regex.IsMatch(password, "^[a-f0-9]{32}$", RegexOptions.IgnoreCase) ? password :
                     Crypto.KerberosPasswordHash(Interop.KERB_ETYPE.rc4_hmac, password);
 
                 var ntlm = Helpers.ConvertHexStringToByteArray(rc4Hash);
 
-                var combinedNTLM = Helpers.Combine(ntlm, utf16sidfinal);
-                byte[] ntlmhmacbytes;
-
                 //Calculate SHA1 of NTLM from user password
-                using (var hmac = new HMACSHA1(ntlm))
-                {
-                    ntlmhmacbytes = hmac.ComputeHash(utf16sidfinal);
-                }
-
                 byte[] tmpbytes1;
-                byte[] tmpbytes2;
-                byte[] tmpkey3bytes;
 
                 using (var hMACSHA256 = new HMACSHA256())
                 {
@@ -1795,15 +1789,15 @@ namespace SharpDPAPI
                 using (var hMACSHA256 = new HMACSHA256())
                 {
                     var deriveBytes = new Pbkdf2(hMACSHA256, tmpbytes1, utf16sid, 1);
-                    tmpbytes2 = deriveBytes.GetBytes(16, "sha256");
+                    derived = deriveBytes.GetBytes(16, "sha256");
                 }
-
-                using (var hmac = new HMACSHA1(tmpbytes2))
-                {
-                    tmpkey3bytes = hmac.ComputeHash(utf16sidfinal);
-                }
-                return tmpkey3bytes;
             }
+
+            using (var hmac = new HMACSHA1(derived))
+            {
+                finalKey = hmac.ComputeHash(utf16sidfinal);
+            }
+            return finalKey;
         }
 
         public static KeyValuePair<string, string> DecryptMasterKey(byte[] masterKeyBytes, byte[] backupKeyBytes)

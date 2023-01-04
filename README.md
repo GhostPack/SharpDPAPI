@@ -104,6 +104,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /pvk:key.pvk            -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
             /password:X             -   first decrypt the current user's masterkeys using a plaintext password or NTLM hash (works remotely)
             /server:SERVER          -   triage a remote server, assuming admin access
+            /local                  -   machine is non domain-joined. Keys use SHA1 instead of NTLM. Password may be supplied in plaintext or as a SHA1 hash
 
 
         Arguments for the credentials|vaults|rdg|keepass|triage|blob|ps commands:

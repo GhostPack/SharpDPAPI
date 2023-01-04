@@ -55,12 +55,13 @@ namespace SharpDPAPI.Commands
                 {
                     if (!arguments.ContainsKey("/sid"))
                     {
-                        Console.WriteLine("[X] When using /password:X with /target:X, a /sid:X (domain user SID) is required!");
+                        Console.WriteLine("[X] When using /password:X with /target:X, a /sid:X (user SID) is required!");
                         return;
                     }
                     else {
                         Console.WriteLine("[*] Triaging masterkey target: {0}\r\n", arguments["/target"]);
-                        mappings = Triage.TriageUserMasterKeys(null, true, "", password, arguments["/target"], arguments["/sid"]);
+                        mappings = Triage.TriageUserMasterKeys(null, true, "", password, arguments["/target"], 
+                            arguments["/sid"], false, arguments.ContainsKey("/local"));
                     }
                 }
                 else
@@ -79,7 +80,7 @@ namespace SharpDPAPI.Commands
                 {
                     if (!arguments.ContainsKey("/sid"))
                     {
-                        Console.WriteLine("[X] When dumping hashes with /target:X, a /sid:X (domain user SID) is required!");
+                        Console.WriteLine("[X] When dumping hashes with /target:X, a /sid:X (user SID) is required!");
                         return;
                     }
                     else
