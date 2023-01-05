@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace SharpDPAPI.Commands
 {
@@ -46,7 +47,11 @@ namespace SharpDPAPI.Commands
             else if (arguments.ContainsKey("/password"))
             {
                 password = arguments["/password"];
-                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
+                
+                Console.WriteLine("[*] Will decrypt user masterkeys with {0}: {1}\r\n", 
+                    Regex.IsMatch(password, @"^([a-f0-9]{32}|[a-f0-9]{40})$", RegexOptions.IgnoreCase)
+                        ? "hash" : "password", password);
+                
                 if (arguments.ContainsKey("/server"))
                 {
                     mappings = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
@@ -55,12 +60,13 @@ namespace SharpDPAPI.Commands
                 {
                     if (!arguments.ContainsKey("/sid"))
                     {
-                        Console.WriteLine("[X] When using /password:X with /target:X, a /sid:X (domain user SID) is required!");
+                        Console.WriteLine("[X] When using /password:X with /target:X, a /sid:X (user SID) is required!");
                         return;
                     }
                     else {
                         Console.WriteLine("[*] Triaging masterkey target: {0}\r\n", arguments["/target"]);
-                        mappings = Triage.TriageUserMasterKeys(null, true, "", password, arguments["/target"], arguments["/sid"]);
+                        mappings = Triage.TriageUserMasterKeys(null, true, "", password, arguments["/target"], 
+                            arguments["/sid"], false, arguments.ContainsKey("/local"));
                     }
                 }
                 else
@@ -79,7 +85,7 @@ namespace SharpDPAPI.Commands
                 {
                     if (!arguments.ContainsKey("/sid"))
                     {
-                        Console.WriteLine("[X] When dumping hashes with /target:X, a /sid:X (domain user SID) is required!");
+                        Console.WriteLine("[X] When dumping hashes with /target:X, a /sid:X (user SID) is required!");
                         return;
                     }
                     else

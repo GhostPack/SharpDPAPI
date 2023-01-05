@@ -45,7 +45,7 @@ User Triage:
         /target:FILE/folder     -   triage a specific masterkey, or a folder full of masterkeys (otherwise triage local masterkeys)
         /pvk:BASE64...          -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
         /pvk:key.pvk            -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
-        /password:X             -   first decrypt the current user's masterkeys using a plaintext password (works remotely)
+        /password:X             -   first decrypt the current user's masterkeys using a plaintext password or hash (works remotely)
         /server:SERVER          -   triage a remote server, assuming admin access
 
 
@@ -53,7 +53,7 @@ User Triage:
 
         Decryption:
             /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
-            /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
+            /password:X         -   first decrypt the current user's masterkeys using a plaintext password or hash. Works with any function, as well as remotely.
             GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
             /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
             /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
