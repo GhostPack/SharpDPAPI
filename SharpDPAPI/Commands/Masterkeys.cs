@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace SharpDPAPI.Commands
 {
@@ -46,7 +47,11 @@ namespace SharpDPAPI.Commands
             else if (arguments.ContainsKey("/password"))
             {
                 password = arguments["/password"];
-                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
+                
+                Console.WriteLine("[*] Will decrypt user masterkeys with {0}: {1}\r\n", 
+                    Regex.IsMatch(password, @"^([a-f0-9]{32}|[a-f0-9]{40})$", RegexOptions.IgnoreCase)
+                        ? "hash" : "password", password);
+                
                 if (arguments.ContainsKey("/server"))
                 {
                     mappings = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
