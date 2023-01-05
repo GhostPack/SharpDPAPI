@@ -58,7 +58,7 @@ namespace SharpDPAPI
                                 }
                                 else if (!String.IsNullOrEmpty(password) && !String.IsNullOrEmpty(userSID))
                                 {
-                                    byte[] hmacBytes = Dpapi.CalculateKeys(password, "", true, userSID);
+                                    byte[] hmacBytes = Dpapi.CalculateKeys(password, "", !local, userSID);
                                     plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
                                 }
                                 else if (dumpHash)
