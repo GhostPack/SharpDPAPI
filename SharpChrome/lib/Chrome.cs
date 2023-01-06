@@ -363,7 +363,8 @@ namespace SharpChrome
                 {
                     $"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State",
                     $"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State",
-                    $"{userDirectory}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State"
+                    $"{userDirectory}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State",
+                    $"{userDirectory}\\AppData\\Roaming\\Microsoft\\Teams\\Local State"
                 };
 
                 foreach(var aesKeyPath in aesKeyPaths)
