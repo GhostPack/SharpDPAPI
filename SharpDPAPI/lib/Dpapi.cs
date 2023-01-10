@@ -15,7 +15,7 @@ namespace SharpDPAPI
 {
     public class Dpapi
     {
-        public static Tuple<string, byte[]> DescribeDPAPICertPrivateKey(string fileName, byte[] dpapiblob, Dictionary<string, string> MasterKeys, byte[] entropy = null)
+        public static Tuple<string, byte[]> DescribeDPAPICertPrivateKey(string fileName, byte[] dpapiblob, Dictionary<string, string> MasterKeys, byte[] entropy = null, bool unprotect = false)
         {
             // decrypts the private key part of a CAPI/CNG blog
 
@@ -83,6 +83,31 @@ namespace SharpDPAPI
             Array.Copy(dpapiblob, offset + 4, signBytes, 0, BitConverter.ToUInt32(dpapiblob, offset));
 
             offset += signBytes.Length + 4;
+
+            if (unprotect)
+            {
+                // use CryptUnprotectData()
+                try
+                {
+                    var decBytes = ProtectedData.Unprotect(dpapiblob, entropy, DataProtectionScope.CurrentUser);
+                    if (decBytes.Length > 0)
+                    {
+                        message += $"\n    Provider GUID    : {strGuidProvider}\n";
+                        message += $"    Master Key GUID  : {strmkguidProvider}\n";
+                        message += $"    Description      : {description}\n";
+                        message += $"    algCrypt         : {(Interop.CryptAlg)algCrypt} (keyLen {algCryptLen})\n";
+                        message += $"    algHash          : {(Interop.CryptAlg)algHash} ({algHash})\n";
+                        message += $"    Salt             : {Helpers.ByteArrayToString(saltBytes)}\n";
+                        message += $"    HMAC             : {Helpers.ByteArrayToString(hmac)}\n";
+                    }
+
+                    return new Tuple<string, byte[]>(message, decBytes);
+                }
+                catch
+                {
+                    Console.WriteLine($"    [!] {fileName} masterkey needed: {strmkguidProvider}");
+                }
+            }
 
             switch (algHash)
             {
@@ -234,7 +259,7 @@ namespace SharpDPAPI
         }
 
 
-        public static Tuple<string, byte[]> DescribeCngCertBlob(string fileName, byte[] blobBytes, Dictionary<string, string> MasterKeys)
+        public static Tuple<string, byte[]> DescribeCngCertBlob(string fileName, byte[] blobBytes, Dictionary<string, string> MasterKeys, bool unprotect = false)
         {
             // Parses a CNG certificate private key blob, decrypting if possible.
 
@@ -274,7 +299,7 @@ namespace SharpDPAPI
             Array.Copy(blobBytes, offset, dpapiblob, 0, dwPrivateKeyLen);
 
             // entropy needed - https://github.com/gentilkiwi/mimikatz/blob/fa42ed93aa4d5aa73825295e2ab757ac96005581/modules/kull_m_key.h#L13
-            Tuple<string, byte[]> result = DescribeDPAPICertPrivateKey(fileName, dpapiblob, MasterKeys, Helpers.Combine(Encoding.UTF8.GetBytes("xT5rZW5qVVbrvpuA"), new byte[1]));
+            Tuple<string, byte[]> result = DescribeDPAPICertPrivateKey(fileName, dpapiblob, MasterKeys, Helpers.Combine(Encoding.UTF8.GetBytes("xT5rZW5qVVbrvpuA"), new byte[1]),unprotect);
 
             string message = result.First;
             if (result.Second.Length > 0)
@@ -286,7 +311,7 @@ namespace SharpDPAPI
         }
 
 
-        public static Tuple<string, byte[]> DescribeCapiCertBlob(string fileName, byte[] blobBytes, Dictionary<string, string> MasterKeys)
+        public static Tuple<string, byte[]> DescribeCapiCertBlob(string fileName, byte[] blobBytes, Dictionary<string, string> MasterKeys, bool unprotect = false)
         {
             // Parses a CAPI certificate private key blob, decrypting if possible.
 
@@ -375,7 +400,7 @@ namespace SharpDPAPI
                     var dpapiblob = new byte[len];
                     Array.Copy(blobBytes, offset, dpapiblob, 0, len);
 
-                    Tuple<string, byte[]> result = DescribeDPAPICertPrivateKey(fileName, dpapiblob, MasterKeys);
+                    Tuple<string, byte[]> result = DescribeDPAPICertPrivateKey(fileName, dpapiblob, MasterKeys, null, unprotect);
                     string message = result.First;
                     if(result.Second.Length > 0)
                     {
@@ -390,18 +415,18 @@ namespace SharpDPAPI
         }
 
 
-        public static ExportedCertificate DescribeCertificate(string fileName, byte[] certificateBytes, Dictionary<string, string> MasterKeys, bool cng = false, bool alwaysShow = false)
+        public static ExportedCertificate DescribeCertificate(string fileName, byte[] certificateBytes, Dictionary<string, string> MasterKeys, bool cng = false, bool alwaysShow = false, bool unprotect = false)
         {
             // takes a raw certificate private key blob and decrypts/displays if possible
 
             Tuple<string, byte[]> result = new Tuple<string, byte[]>("", null);
             if (cng)
             {
-                result = DescribeCngCertBlob(fileName, certificateBytes, MasterKeys);
+                result = DescribeCngCertBlob(fileName, certificateBytes, MasterKeys, unprotect);
             }
             else
             {
-                result = DescribeCapiCertBlob(fileName, certificateBytes, MasterKeys);
+                result = DescribeCapiCertBlob(fileName, certificateBytes, MasterKeys, unprotect);
             }
 
             string statusMessage = result.First;

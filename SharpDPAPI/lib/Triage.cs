@@ -626,7 +626,7 @@ namespace SharpDPAPI
             Console.WriteLine();
         }
 
-        public static void TriageCertFile(string certFilePath, Dictionary<string, string> MasterKeys, bool cng = false, bool alwaysShow = false)
+        public static void TriageCertFile(string certFilePath, Dictionary<string, string> MasterKeys, bool cng = false, bool alwaysShow = false, bool unprotect = false)
         {
             // triage a certificate file
 
@@ -635,7 +635,7 @@ namespace SharpDPAPI
 
             try
             {
-                ExportedCertificate cert = Dpapi.DescribeCertificate(fileName, certificateBytes, MasterKeys, cng, alwaysShow);
+                ExportedCertificate cert = Dpapi.DescribeCertificate(fileName, certificateBytes, MasterKeys, cng, alwaysShow, unprotect);
 
                 if (cert.Thumbprint != "")
                 {
@@ -673,7 +673,7 @@ namespace SharpDPAPI
             }
         }
 
-        public static void TriageCertFolder(string folder, Dictionary<string, string> MasterKeys, bool cng = false, bool alwaysShow = false)
+        public static void TriageCertFolder(string folder, Dictionary<string, string> MasterKeys, bool cng = false, bool alwaysShow = false, bool unprotect = false)
         {
             // triage a specific certificate folder
             if (!Directory.Exists(folder))
@@ -690,7 +690,7 @@ namespace SharpDPAPI
                         @"[0-9A-Fa-f]{32}[_][0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}")
                     )
                     {
-                        TriageCertFile(file, MasterKeys, cng, alwaysShow);
+                        TriageCertFile(file, MasterKeys, cng, alwaysShow, unprotect);
                     }
                 }
             }
@@ -734,7 +734,7 @@ namespace SharpDPAPI
             }
         }
 
-        public static void TriageUserCerts(Dictionary<string, string> MasterKeys, string computerName = "", bool showall = false)
+        public static void TriageUserCerts(Dictionary<string, string> MasterKeys, string computerName = "", bool showall = false, bool unprotect = false)
         {
             string[] userDirs;
             if (!String.IsNullOrEmpty(computerName))
@@ -778,7 +778,7 @@ namespace SharpDPAPI
 
                 foreach (var directory in directories)
                 {
-                    TriageCertFolder(directory, MasterKeys, false, showall);
+                    TriageCertFolder(directory, MasterKeys, false, showall, unprotect);
                 }
 
                 var userCngKeysPath = $"{dir}\\AppData\\Roaming\\Microsoft\\Crypto\\Keys\\";
@@ -786,7 +786,7 @@ namespace SharpDPAPI
                 if (!Directory.Exists(userCngKeysPath))
                     continue;
 
-                TriageCertFolder(userCngKeysPath, MasterKeys, true, showall);
+                TriageCertFolder(userCngKeysPath, MasterKeys, true, showall, unprotect);
             }
         }
 

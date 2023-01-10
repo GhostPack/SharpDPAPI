@@ -17,6 +17,14 @@ namespace SharpDPAPI.Commands
             string server;              // used for remote server specification
             bool cng = false;           // used for CNG certs
             bool showall = false;       // used for CNG certs
+            bool unprotect = false;         // whether to force CryptUnprotectData()
+
+            if (arguments.ContainsKey("/unprotect"))
+            {
+                Console.WriteLine("\r\n[*] Using CryptUnprotectData() for decryption.");
+                unprotect = true;
+            }
+            Console.WriteLine();
 
             // {GUID}:SHA1 keys are the only ones that don't start with /
             Dictionary<string, string> masterkeys = new Dictionary<string, string>();
@@ -143,12 +151,12 @@ namespace SharpDPAPI.Commands
                     if (File.Exists(target))
                     {
                         Console.WriteLine("[*] Target Certificate File: {0}\r\n", target);
-                        Triage.TriageCertFile(target, masterkeys, cng, showall);
+                        Triage.TriageCertFile(target, masterkeys, cng, showall, unprotect);
                     }
                     else if (Directory.Exists(target))
                     {
                         Console.WriteLine("[*] Target Certificate Folder: {0}\r\n", target);
-                        Triage.TriageCertFolder(target, masterkeys, cng, showall);
+                        Triage.TriageCertFolder(target, masterkeys, cng, showall, unprotect);
                     }
                     else
                     {
@@ -157,7 +165,7 @@ namespace SharpDPAPI.Commands
                 }
                 else
                 {
-                    Triage.TriageUserCerts(masterkeys, "", showall);
+                    Triage.TriageUserCerts(masterkeys, "", showall, unprotect);
                 }
             }
 

@@ -72,6 +72,7 @@ Certificate Triage:
         /showall                                        -   show all decrypted private key files, not just ones that are linked to installed certs (the default)
         /machine                                        -   use the local machine store for certificate triage
         /mkfile | /target                               -   for /machine triage
+        /unprotect                                      -   force use of CryptUnprotectData() for user triage
         /pvk | /mkfile | /password | /server | /target  -   for user triage
     
 
