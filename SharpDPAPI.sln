@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33213.308
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpDPAPI", "SharpDPAPI\SharpDPAPI.csproj", "{5F026C27-F8E6-4052-B231-8451C6A73838}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpChrome", "SharpChrome\SharpChrome.csproj", "{2F00A05B-263D-4FCC-846B-DA82BD684603}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestProject1", "UnitTestProject1\UnitTestProject1.csproj", "{C63D666B-50E6-43B5-ACE3-A473F580BACC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,8 +23,15 @@ Global
 		{2F00A05B-263D-4FCC-846B-DA82BD684603}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2F00A05B-263D-4FCC-846B-DA82BD684603}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2F00A05B-263D-4FCC-846B-DA82BD684603}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C63D666B-50E6-43B5-ACE3-A473F580BACC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C63D666B-50E6-43B5-ACE3-A473F580BACC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C63D666B-50E6-43B5-ACE3-A473F580BACC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C63D666B-50E6-43B5-ACE3-A473F580BACC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B8D5069A-0CBD-44A9-8D79-A84DFD899B3C}
 	EndGlobalSection
 EndGlobal

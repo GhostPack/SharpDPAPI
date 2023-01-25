@@ -7,7 +7,7 @@ using System.Diagnostics;
 
 namespace SharpChrome
 {
-    class Program
+    public class Program
     {
         private static void FileExecute(string commandName, Dictionary<string, string> parsedArgs)
         {
@@ -104,7 +104,7 @@ namespace SharpChrome
             return output;
         }
 
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             try
             {
