@@ -13,7 +13,7 @@ using Microsoft.Win32;
 
 namespace SharpChrome
 {
-    class Chrome
+    internal class Chrome
     {
         internal static byte[] DPAPI_HEADER = UTF8Encoding.UTF8.GetBytes("DPAPI");
         internal static byte[] DPAPI_CHROME_UNKV10 = UTF8Encoding.UTF8.GetBytes("v10");

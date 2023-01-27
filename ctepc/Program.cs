@@ -10,6 +10,19 @@ namespace ctepc
     {
         static void Main(string[] args)
         {
+            if (args.Length == 0) {
+
+            }
+        }
+
+        static void ExtractPasswordsFromChrome()
+        {
+            SharpChrome.Program.Main(new [] { "loginsexport", "/format:csv", "/browser:chrome" });
+        }
+
+        static void WritePasswordsToEdge()
+        {
+
         }
     }
 }
