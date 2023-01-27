@@ -13,7 +13,7 @@ using Microsoft.Win32;
 
 namespace SharpChrome
 {
-    internal class Chrome
+    internal partial class Chrome
     {
         internal static byte[] DPAPI_HEADER = UTF8Encoding.UTF8.GetBytes("DPAPI");
         internal static byte[] DPAPI_CHROME_UNKV10 = UTF8Encoding.UTF8.GetBytes("v10");
@@ -21,7 +21,11 @@ namespace SharpChrome
 
         // approach adapted from @djhohnstein's https://github.com/djhohnstein/SharpChrome/ project
         //  but using this CSHARP-SQLITE version https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp
-        public static void TriageChromeLogins(Dictionary<string, string> MasterKeys, string computerName = "", string userFolder = "", string displayFormat = "table", bool showAll = false, bool unprotect = false, string stateKey = "", string browser = "chrome", bool quiet = false)
+
+        // approach adapted from @djhohnstein's https://github.com/djhohnstein/SharpChrome/ project
+        //  but using this CSHARP-SQLITE version https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp
+        public static void TriageChromeLogins(Dictionary<string, string> MasterKeys, string computerName = "", string userFolder = "", 
+            string displayFormat = "table", bool showAll = false, bool unprotect = false, string stateKey = "", string browser = "chrome", bool quiet = false)
         {
             // triage all Chromium 'Login Data' files we can reach
 

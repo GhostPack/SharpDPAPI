@@ -1,6 +1,9 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
+using SharpChrome.Extensions;
 
 namespace UnitTestProject1
 {
@@ -10,14 +13,18 @@ namespace UnitTestProject1
         [TestMethod]
         public void TestLoginsExportCommandChrome()
         {
-            SharpChrome.Program.Main(new [] { "loginsexport", "/format:csv", "/browser:chrome" });
+            SharpChrome.Program.Main(new [] { "loginsexport" });
         }
 
         [TestMethod]
-        public void TestShowUsage()
+        public async Task TestShowUsage()
         {
-            using var consoleOutput = Console.OpenStandardOutput(255);
+            //using var consoleOutput = Console.OpenStandardOutput(255);
+            //var currentProcess = Process.GetCurrentProcess();
+            //var consoleOutput = currentProcess.StandardOutput;
             SharpChrome.Program.Main(new [] { "help" });
+
+            //var allConsoleOutput = await consoleOutput.ReadToEndAsync();
         }
 
         [TestMethod]
