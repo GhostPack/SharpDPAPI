@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpChrome", "SharpChrome\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestProject1", "UnitTestProject1\UnitTestProject1.csproj", "{C63D666B-50E6-43B5-ACE3-A473F580BACC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ctepc", "ctepc\ctepc.csproj", "{673D3045-3819-4F39-8DCC-92760E0F0B67}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{C63D666B-50E6-43B5-ACE3-A473F580BACC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C63D666B-50E6-43B5-ACE3-A473F580BACC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C63D666B-50E6-43B5-ACE3-A473F580BACC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{673D3045-3819-4F39-8DCC-92760E0F0B67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{673D3045-3819-4F39-8DCC-92760E0F0B67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{673D3045-3819-4F39-8DCC-92760E0F0B67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{673D3045-3819-4F39-8DCC-92760E0F0B67}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
