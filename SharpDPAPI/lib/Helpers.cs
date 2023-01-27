@@ -296,7 +296,7 @@ namespace SharpDPAPI
             return sb.ToString();
         }
 
-        public static DateTime ConvertToDateTime(string chromeTime)
+        public static DateTime ConvertToDateTime(double dateCreatedRaw)
         {
             // helper that converts Chrome's stupid timestamp format
             // https://stackoverflow.com/questions/20458406/what-is-the-format-of-chromes-timestamps
@@ -304,7 +304,6 @@ namespace SharpDPAPI
             DateTime epoch = new DateTime(1601, 1, 1);
             try
             {
-                double dateCreatedRaw = double.Parse(chromeTime);
                 double secsFromEpoch = dateCreatedRaw / 1000000;
                 if (secsFromEpoch > TimeSpan.MaxValue.TotalSeconds)
                 {
@@ -322,6 +321,26 @@ namespace SharpDPAPI
                 // in case the parsing fails
                 return epoch;
             }
+        }
+
+        public static DateTime ConvertToDateTime(string chromeTime)
+        {
+            double dateCreatedRaw = double.Parse(chromeTime);
+            return ConvertToDateTime(dateCreatedRaw);
+        }
+
+        /// <summary>
+        /// Converts a <see cref="DateTime"/> instance back to Chrome's custom date time format.
+        /// </summary>
+        /// <param name="dt">This method assumes the given DateTime instance is in local time.</param>
+        /// <returns></returns>
+        public static double ConvertToChromeTime(DateTime dt)
+        {
+            DateTime epoch = new DateTime(1601, 1, 1).ToLocalTime();
+            TimeSpan span = dt.Subtract(epoch);
+            var ts = span.TotalSeconds;
+		
+            return ts * 1000000;
         }
 
         public static Dictionary<string, string> ParseMasterKeyFile(string filePath)
