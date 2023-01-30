@@ -103,7 +103,7 @@ namespace SharpChrome
                 byte[] chromeAesStateKey = GetStateKey(masterKeys, chromeAesStateKeyPath, unprotect, quiet);
                 byte[] edgeAesStateKey = GetStateKey(masterKeys, edgeAesStateKeyPath, unprotect, quiet);
 
-                var chromeLogins = ParseAndReturnChromeLogins(masterKeys, chromeLoginDataPath, displayFormat, showAll, unprotect, chromeAesStateKey,
+                 var chromeLogins = ParseAndReturnChromeLogins(masterKeys, chromeLoginDataPath, displayFormat, showAll, unprotect, chromeAesStateKey,
                     quiet);
                 var edgePasswords = ParseAndReturnChromeLogins(masterKeys, edgeLoginDataPath, displayFormat, showAll, unprotect, edgeAesStateKey,
                     quiet);

@@ -31,6 +31,7 @@ namespace UnitTestProject1
         [TestMethod]
         public void TestGetLoginCommandChrome()
         {
+            throw new NotSupportedException();
             SharpChrome.Program.Main(new [] { "logins", "/format:csv", "/browser:chrome" });
         }
     }

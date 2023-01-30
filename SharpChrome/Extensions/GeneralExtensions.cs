@@ -60,6 +60,7 @@ namespace SharpChrome.Extensions
             BCrypt.SafeKeyHandle hKey = null;
 
             var keyDecryptResult = Chrome.DPAPIChromeAlgKeyFromRaw(aesStateKey, out hAlg, out hKey);
+            if (false == keyDecryptResult) throw new Exception("Unable to determine algorithm key!");
             var loginsList = logins.ToList();
 
             foreach (var login in loginsList) {
@@ -78,10 +79,14 @@ namespace SharpChrome.Extensions
                 else {
                     // using the old method
                     Dictionary<string, string> masterKeys = new Dictionary<string, string>();
-                    decBytes = SharpDPAPI.Dpapi.DescribeDPAPIBlob(blobBytes: passwordBytes, MasterKeys: masterKeys, blobType: "chrome");
+                    decBytes = Dpapi.DescribeDPAPIBlob(blobBytes: passwordBytes, MasterKeys: masterKeys, blobType: "chrome");
                 }
 
                 password = Encoding.ASCII.GetString(decBytes);
+                var nonce = BouncyCastleExtensions.GetNonce(passwordBytes);
+                var encryptedWithBc = BouncyCastleExtensions.EncryptWithGcm(decBytes, aesStateKey, nonce);
+                var reDecryptedWithBc = BouncyCastleExtensions.DecryptWithGcm(encryptedWithBc, aesStateKey, nonce);
+                var reDecryptedWithBc2 = BouncyCastleExtensions.DecryptWithGcm(passwordBytes, aesStateKey, nonce);
 
                 login.setDecrypted_password_value(password);
             }
