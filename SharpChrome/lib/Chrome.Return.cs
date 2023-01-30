@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Security.Policy;
 using System.Text;
+using SharpChrome.Extensions;
 using SQLite;
 
 namespace SharpChrome
@@ -89,13 +90,15 @@ namespace SharpChrome
             }
 
             foreach (string userDirectory in userDirectories) {
-                var chromeLoginDataPath =
-                    $"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data";
-                var chromeAesStateKeyPath = $"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State";
+                //var chromeLoginDataPath = $"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data";
+                var chromeLoginDataPath = $@"C:\temp\chrome\Login Data";
+                //var chromeAesStateKeyPath = $"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State";
+                var chromeAesStateKeyPath = $@"C:\temp\chrome\Local State";
 
-                var edgeLoginDataPath =
-                    $"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data";
-                var edgeAesStateKeyPath = $"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State";
+                //var edgeLoginDataPath = $"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data";
+                var edgeLoginDataPath = $@"C:\temp\edge\Login Data";
+                //var edgeAesStateKeyPath = $"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State";
+                var edgeAesStateKeyPath = $@"C:\temp\edge\Local State";
 
                 byte[] chromeAesStateKey = GetStateKey(masterKeys, chromeAesStateKeyPath, unprotect, quiet);
                 byte[] edgeAesStateKey = GetStateKey(masterKeys, edgeAesStateKeyPath, unprotect, quiet);
@@ -133,6 +136,9 @@ namespace SharpChrome
     [SuppressMessage("ReSharper", "UnusedMember.Global"), SuppressMessage("ReSharper", "InconsistentNaming")]
     public class logins
     {
+        private string _decryptedPasswordValue;
+
+        /// <summary>Required when saving </summary>
         public string origin_url { get; set; }
         public string action_url { get; set; }
         public string username_element { get; set; }
@@ -140,9 +146,13 @@ namespace SharpChrome
         public string password_element { get; set; }
         public byte[] password_value { get; set; }
         public string submit_element { get; set; }
+        /// <summary>Required when saving </summary>
         public string signon_realm { get; set; }
-        public long date_created { get; set; }
+        /// <summary>Required when saving </summary>
+        public double date_created { get; set; }
+        /// <summary>Required when saving </summary>
         public int blacklisted_by_user { get; set; }
+        /// <summary>Required when saving </summary>
         public int scheme { get; set; }
         public int password_type { get; set; }
         public int times_used { get; set; }
@@ -154,9 +164,15 @@ namespace SharpChrome
         public int generation_upload_status { get; set; }
         public byte[] possible_username_pairs { get; set; }
         public int id { get; set; }
-        public long date_last_used { get; set; }
+        /// <summary>Required when saving </summary>
+        public double date_last_used { get; set; }
         public byte[] moving_blocked_for { get; set; }
-        public long date_password_modified { get; set; }
+        /// <summary>Required when saving </summary>
+        public double date_password_modified { get; set; }
+
+        public string decrypted_password_value => _decryptedPasswordValue;
+
+        public void setDecrypted_password_value(string value) => _decryptedPasswordValue = value;
     }
 
     internal partial class Chrome
@@ -200,10 +216,15 @@ namespace SharpChrome
                 return default;
             }
 
-            string query =
+            string discriminatingQuery =
                 "SELECT signon_realm, origin_url, username_value, password_value, times_used, cast(date_created as text) as date_created FROM logins";
-            List<SQLiteQueryRow> results = database.Query2(query, false);
+            string everyColQuery = "SELECT * FROM logins";
+
+            List<SQLiteQueryRow> results = database.Query2(everyColQuery, false);
             
+            List<logins> allLogins = database.Query<logins>(everyColQuery, false);
+            var allLoginsDecryptedPwd = allLogins.DecryptPasswords(aesStateKey);
+
             List<ExtractedPassword> passwords = new List<ExtractedPassword>(results.Count);
 
             foreach (SQLiteQueryRow row in results) {

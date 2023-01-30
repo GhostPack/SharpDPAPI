@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using SharpChrome.Commands;
 using SharpChrome.Extensions;
 
 namespace UnitTestProject1
@@ -13,7 +14,7 @@ namespace UnitTestProject1
         [TestMethod]
         public void TestLoginSync()
         {
-            SharpChrome.Program.Main(new [] { "loginsync" });
+            SharpChrome.Program.Main(new [] { LoginSync.CommandName });
         }
 
         [TestMethod]
