@@ -13,6 +13,8 @@ namespace SharpDPAPI
 {
     public static class Helpers
     {
+        private static int _chromeTimeMultiplier = 1000000;
+
         public static void EncodeLength(BinaryWriter stream, int length)
         {
             if (length < 0) throw new ArgumentOutOfRangeException("length", "Length must be non-negative");
@@ -304,7 +306,7 @@ namespace SharpDPAPI
             DateTime epoch = new DateTime(1601, 1, 1);
             try
             {
-                double secsFromEpoch = dateCreatedRaw / 1000000;
+                double secsFromEpoch = dateCreatedRaw / _chromeTimeMultiplier;
                 if (secsFromEpoch > TimeSpan.MaxValue.TotalSeconds)
                 {
                     // handle timestamps over the allowed range
@@ -340,7 +342,7 @@ namespace SharpDPAPI
             TimeSpan span = dt.Subtract(epoch);
             var ts = span.TotalSeconds;
 		
-            return ts * 1000000;
+            return ts * _chromeTimeMultiplier;
         }
 
         public static Dictionary<string, string> ParseMasterKeyFile(string filePath)

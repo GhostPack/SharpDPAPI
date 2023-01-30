@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Security.Policy;
 using System.Text;
@@ -129,6 +130,7 @@ namespace SharpChrome
         }
     }
 
+    [SuppressMessage("ReSharper", "UnusedMember.Global"), SuppressMessage("ReSharper", "InconsistentNaming")]
     public class logins
     {
         public string origin_url { get; set; }

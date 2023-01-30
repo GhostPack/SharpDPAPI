@@ -11,9 +11,9 @@ namespace UnitTestProject1
     public class UnitTest1
     {
         [TestMethod]
-        public void TestLoginsExportCommandChrome()
+        public void TestLoginSync()
         {
-            SharpChrome.Program.Main(new [] { "loginsexport" });
+            SharpChrome.Program.Main(new [] { "loginsync" });
         }
 
         [TestMethod]

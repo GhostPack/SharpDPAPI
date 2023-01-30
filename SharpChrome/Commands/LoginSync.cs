@@ -7,9 +7,9 @@ namespace SharpChrome.Commands
     /// <summary>
     /// Copy logins from Chrome to edge.
     /// </summary>
-    public class LoginsExport : ICommand
+    public class LoginSync : ICommand
     {
-        public static string CommandName => nameof(LoginsExport).ToLower();
+        public static string CommandName => nameof(LoginSync).ToLower();
 
         public void Execute(Dictionary<string, string> arguments)
         {
