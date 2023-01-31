@@ -85,11 +85,11 @@ namespace SharpChrome.Extensions
                     decBytes = Dpapi.DescribeDPAPIBlob(blobBytes: passwordBytes, MasterKeys: masterKeys, blobType: "chrome");
                 }
 
-                var chromePasswordSegments = passwordBytes.ToSegmentedChromePass();
+                var binaryChromePass = passwordBytes.ToSegmentedChromePass();
                 password = Encoding.ASCII.GetString(decBytes);
 
-                byte[] reEncrypted = Chrome.EncryptAESChromeBlob(decBytes, hAlg, hKey, chromePasswordSegments);
-                byte[] reEncrypted2 = Chrome.EncryptAESChromeBlob(decBytes, hAlg, hKey, chromePasswordSegments);
+                byte[] reEncrypted = Chrome.EncryptAESChromeBlob(decBytes, hAlg, hKey, binaryChromePass);
+                var reEncrypted_2b = Chrome.EncryptAESChromeBlob2(decBytes, aesStateKey, binaryChromePass);
 
                 var nonce = BouncyCastleExtensions.GetNonce(passwordBytes);
                 var encryptedWithBc = BouncyCastleExtensions.EncryptWithGcm(decBytes, aesStateKey, nonce);
@@ -97,7 +97,7 @@ namespace SharpChrome.Extensions
 
                 var en_good = Helpers.ByteArrayToString(passwordBytes);
                 var en_good2 = Helpers.ByteArrayToString(reEncrypted);
-                var en_good2b = Helpers.ByteArrayToString(reEncrypted);
+                var en_good2b = Helpers.ByteArrayToString(reEncrypted_2b);
 
                 var passwordBytes2 = Chrome.DecryptAESChromeBlob(reEncrypted, hAlg, hKey, out var _);
                 var password2_utf = Encoding.UTF8.GetString(passwordBytes2);

@@ -246,6 +246,24 @@ namespace SharpChrome
         }
 
         /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="dataToEncrypt">Data to encrypt</param>
+        /// <param name="aesEncryptionKey"></param>
+        /// <param name="chPass"></param>
+        /// <returns></returns>
+        public static byte[] EncryptAESChromeBlob2(byte[] dataToEncrypt, byte[] aesEncryptionKey, BinaryChromePass chPass)
+        {
+            var encrypted = AESGCM.GcmEncrypt(dataToEncrypt, aesEncryptionKey, chPass.InitVector, chPass.Tag);
+
+            var v10HeaderAndIv = DPAPI_CHROME_UNKV10.ArrayConcat(chPass.InitVector);
+            var v10HeaderAndIvAndEncryptedData = v10HeaderAndIv.ArrayConcat(encrypted);
+            var v10HeaderAndIvAndEncryptedDataAndTag = v10HeaderAndIvAndEncryptedData.ArrayConcat(chPass.Tag);
+                
+            return v10HeaderAndIvAndEncryptedDataAndTag;
+        }
+
+        /// <summary>
         /// adapted from https://github.com/djhohnstein/SharpChrome/blob/e287334c0592abb02bf4f45ada23fecaa0052d48/ChromeCredentialManager.cs#L136-L197
         /// </summary>
         /// <param name="ewData">Data to encrypt</param>
@@ -282,10 +300,10 @@ namespace SharpChrome
                         //info.pbNonce = (byte*)(new IntPtr(pData.ToInt64()));
                         info.cbNonce = GCM_INITIALIZATION_VECTOR_SIZE;
                         info.pbTag = info.pbNonce + ewData.Length - (DPAPI_CHROME_UNKV10.Length + AES_BLOCK_SIZE); // AES_BLOCK_SIZE = 16
-                        //info.pbTag = info.pbNonce + ewData.Length - (AES_BLOCK_SIZE); // AES_BLOCK_SIZE = 16
+                        //info.pbTag = info.pbNonce + dataToEncrypt.Length - (AES_BLOCK_SIZE); // AES_BLOCK_SIZE = 16
                         info.cbTag = AES_BLOCK_SIZE; // AES_BLOCK_SIZE = 16
-                        //edwDataOutLen = ewData.Length + DPAPI_CHROME_UNKV10.Length + info.cbNonce + info.cbTag;
-                        //edwDataOutLen = ewData.Length + info.cbNonce + info.cbTag;
+                        //edwDataOutLen = dataToEncrypt.Length + DPAPI_CHROME_UNKV10.Length + info.cbNonce + info.cbTag;
+                        //edwDataOutLen = dataToEncrypt.Length + info.cbNonce + info.cbTag;
                         edwDataOutLen = ewData.Length;
                         ewDataOut = new byte[edwDataOutLen];
                         
