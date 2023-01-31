@@ -103,6 +103,7 @@
     <Compile Include="Extensions\BouncyCastleExtensions.cs" />
     <Compile Include="Extensions\GeneralExtensions.cs" />
     <Compile Include="lib\Bcrypt.cs" />
+    <Compile Include="lib\Bcrypt.encrypt.cs" />
     <Compile Include="lib\Chrome.cs" />
     <Compile Include="lib\Chrome.Return.cs" />
     <Compile Include="Program.cs" />

@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace SharpChrome
 {
-    public class BCrypt
+    public partial class BCrypt
     {
         // adapted from https://github.com/AArnott/pinvoke/blob/master/src/BCrypt/
         // Author: @AArnott

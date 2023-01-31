@@ -25,26 +25,26 @@ namespace SharpChrome.Extensions
             return ciphertextTagBytes;
         }
 
-        public static byte[] DecryptWithGcm(byte[] ciphertextTagBytes, byte[] key, byte[] nonce = null)
+        public static byte[] DecryptWithGcm(byte[] encryptedBytes, byte[] key, byte[] nonce = null)
         {
             var tagLength = 16;
 
             if (nonce == null) {
-                nonce = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                nonce = new byte[12];
                 //trim first 3 bytes(signature "v10") and take 12 bytes after signature.
                 const int nonceLength = 12;
-                Array.Copy(ciphertextTagBytes, 3, nonce, 0, nonceLength);
+                Array.Copy(sourceArray: encryptedBytes, sourceIndex: 3, destinationArray: nonce, destinationIndex: 3+12, length: nonceLength);
             }
 
-            var plaintextBytes = new byte[ciphertextTagBytes.Length - tagLength];
+            var plaintextBytes = new byte[encryptedBytes.Length - tagLength];
             byte[] tag = new byte[tagLength]; // AuthTag
-            Array.Copy(ciphertextTagBytes, ciphertextTagBytes.Length - tagLength, tag, 0, tagLength);
+            Array.Copy(encryptedBytes, encryptedBytes.Length - tagLength, tag, 0, tagLength);
 
             var cipher = new GcmBlockCipher(new AesEngine());
             var parameters = new AeadParameters(new KeyParameter(key), 8 * 16, nonce);
             cipher.Init(false, parameters);
 
-            var offset = cipher.ProcessBytes(ciphertextTagBytes, 0, ciphertextTagBytes.Length, plaintextBytes, 0);
+            var offset = cipher.ProcessBytes(encryptedBytes, 0, encryptedBytes.Length, plaintextBytes, 0);
             cipher.DoFinal(plaintextBytes, offset); // authenticate data via tag
 
             return plaintextBytes;
@@ -52,12 +52,10 @@ namespace SharpChrome.Extensions
 
         public static byte[] GetNonce(byte[] encryptedBytesConcatenatedWithTag)
         {
-            var tagLength = 16;
-
-            var nonce = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // IV 12 bytes
+            const int nonceLength = 12;
+            var nonce = new byte[nonceLength]; // IV 12 bytes
 
             //trim first 3 bytes(signature "v10") and take 12 bytes after signature.
-            const int nonceLength = 12;
             Array.Copy(encryptedBytesConcatenatedWithTag, 3, nonce, 0, nonceLength);
 
             return nonce;

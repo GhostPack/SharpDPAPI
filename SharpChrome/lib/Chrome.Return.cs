@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Security.Policy;
 using System.Text;
 using SharpChrome.Extensions;
@@ -103,7 +104,7 @@ namespace SharpChrome
                 byte[] chromeAesStateKey = GetStateKey(masterKeys, chromeAesStateKeyPath, unprotect, quiet);
                 byte[] edgeAesStateKey = GetStateKey(masterKeys, edgeAesStateKeyPath, unprotect, quiet);
 
-                 var chromeLogins = ParseAndReturnChromeLogins(chromeLoginDataPath, chromeAesStateKey);
+                var chromeLogins = ParseAndReturnChromeLogins(chromeLoginDataPath, chromeAesStateKey);
                 var edgePasswords = ParseAndReturnChromeLogins(edgeLoginDataPath, edgeAesStateKey);
             }
         }
@@ -221,15 +222,87 @@ namespace SharpChrome
             return allLoginsDecryptedPwd;
         }
         
-        public static void InsertPasswordsIntoDbFile(string loginDataFilePath, IEnumerable<ExtractedPassword> passwords)
+        public static void InsertPasswordsIntoDbFile(string loginDataFilePath, IEnumerable<logins> logins)
         {
             var uri = new Uri(loginDataFilePath);
             string loginDataFilePathUri = $"{uri.AbsoluteUri}?nolock=1";
             SQLiteConnection database = null;
-            
-            database = new SQLiteConnection(loginDataFilePathUri, SQLiteOpenFlags.ReadWrite, false);
 
-            //database.InsertOrReplace()
+            using (database = new SQLiteConnection(loginDataFilePathUri, SQLiteOpenFlags.ReadWrite, false)) {
+                database.InsertOrReplace(logins);
+            }
+        }
+
+        public static byte[] GetSubArraySansV10(byte[] dwData)
+        {
+            byte[] subArrayNoV10 = new byte[dwData.Length - DPAPI_CHROME_UNKV10.Length];
+            Array.Copy(dwData, 3, subArrayNoV10, 0, dwData.Length - DPAPI_CHROME_UNKV10.Length);
+
+            return subArrayNoV10;
+        }
+        
+        /// <summary>
+        /// adapted from https://github.com/djhohnstein/SharpChrome/blob/e287334c0592abb02bf4f45ada23fecaa0052d48/ChromeCredentialManager.cs#L136-L197
+        /// </summary>
+        /// <param name="dwData"></param>
+        /// <param name="hAlg"></param>
+        /// <param name="hKey"></param>
+        /// <returns></returns>
+        public static byte[] EncryptAESChromeBlob(byte[] dwData, BCrypt.SafeAlgorithmHandle hAlg, BCrypt.SafeKeyHandle hKey)
+        {
+            byte[] dwDataOut = null;
+            BCrypt.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO info;
+            int dwDataOutLen;
+            IntPtr pData = IntPtr.Zero;
+            uint ntStatus;
+            byte[] subArrayNoV10;
+            int pcbResult = 0;
+
+            unsafe
+            {
+                if (SharpDPAPI.Helpers.ByteArrayEquals(dwData, 0, DPAPI_CHROME_UNKV10, 0, 3))
+                {
+                    subArrayNoV10 = new byte[dwData.Length - DPAPI_CHROME_UNKV10.Length];
+                    Array.Copy(dwData, 3, subArrayNoV10, 0, dwData.Length - DPAPI_CHROME_UNKV10.Length);
+                    pData = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(byte)) * dwData.Length);
+
+                    try
+                    {
+                        Marshal.Copy(dwData, 0, pData, dwData.Length);
+                        BCrypt.BCRYPT_INIT_AUTH_MODE_INFO(out info);
+                        info.pbNonce = (byte*)(new IntPtr(pData.ToInt64() + DPAPI_CHROME_UNKV10.Length));
+                        info.cbNonce = 12;
+                        info.pbTag = info.pbNonce + dwData.Length - (DPAPI_CHROME_UNKV10.Length + AES_BLOCK_SIZE); // AES_BLOCK_SIZE = 16
+                        info.cbTag = AES_BLOCK_SIZE; // AES_BLOCK_SIZE = 16
+                        dwDataOutLen = dwData.Length - DPAPI_CHROME_UNKV10.Length - info.cbNonce - info.cbTag;
+                        dwDataOut = new byte[dwDataOutLen];
+
+                        fixed (byte* pDataOut = dwDataOut)
+                        {
+                            ntStatus = BCrypt.BCryptEncrypt(hKey, info.pbNonce + info.cbNonce, dwDataOutLen, (void*)&info, null, 0, pDataOut, dwDataOutLen, out pcbResult, 0);
+                        }
+
+                        if (ntStatus != 0)
+                        {
+                            Console.WriteLine("[X] Error : {0}", SharpDPAPI.Interop.GetLastError());
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Exception : {0}", ex.Message);
+                    }
+                    finally
+                    {
+                        if (pData != null && pData != IntPtr.Zero)
+                            Marshal.FreeHGlobal(pData);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[X] Data header not equal to DPAPI_CHROME_UNKV10");
+                }
+            }
+            return dwDataOut;
         }
     }
 }

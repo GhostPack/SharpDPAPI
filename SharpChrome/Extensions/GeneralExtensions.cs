@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -83,10 +84,18 @@ namespace SharpChrome.Extensions
                 }
 
                 password = Encoding.ASCII.GetString(decBytes);
+
                 var nonce = BouncyCastleExtensions.GetNonce(passwordBytes);
                 var encryptedWithBc = BouncyCastleExtensions.EncryptWithGcm(decBytes, aesStateKey, nonce);
                 var reDecryptedWithBc = BouncyCastleExtensions.DecryptWithGcm(encryptedWithBc, aesStateKey, nonce);
-                var reDecryptedWithBc2 = BouncyCastleExtensions.DecryptWithGcm(passwordBytes, aesStateKey, nonce);
+
+                var en_good = Helpers.ByteArrayToString(passwordBytes);
+                var en_reCreation = Helpers.ByteArrayToString(encryptedWithBc);
+
+                var de_good = Helpers.ByteArrayToString(decBytes);
+                var de_reCreation = Helpers.ByteArrayToString(reDecryptedWithBc);
+                
+                //var reDecryptedWithBc2 = BouncyCastleExtensions.DecryptWithGcm(passwordBytes, aesStateKey, nonce);
 
                 login.setDecrypted_password_value(password);
             }
