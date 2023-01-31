@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Community.CsharpSqlite;
@@ -57,6 +58,7 @@ namespace SharpChrome.Extensions
         {
             if (aesStateKey == null || aesStateKey.Length == default) throw new ArgumentNullException(nameof(aesStateKey));
 
+            byte[] iv = new byte[12];
             BCrypt.SafeAlgorithmHandle hAlg = null;
             BCrypt.SafeKeyHandle hKey = null;
 
@@ -71,7 +73,7 @@ namespace SharpChrome.Extensions
 
                 if (HasV10Header(passwordBytes)) {
                     // using the new DPAPI decryption method
-                    decBytes = Chrome.DecryptAESChromeBlob(passwordBytes, hAlg, hKey);
+                    decBytes = Chrome.DecryptAESChromeBlob(passwordBytes, hAlg, hKey, out iv);
 
                     if (decBytes == null) {
                         throw new Exception($"Unable to decrypt {nameof(login.password_value)} ({login.username_value} :: {login.origin_url})");
@@ -85,11 +87,19 @@ namespace SharpChrome.Extensions
 
                 password = Encoding.ASCII.GetString(decBytes);
 
+                byte[] reEncrypted = Chrome.EncryptAESChromeBlob(decBytes, hAlg, hKey, iv);
+
                 var nonce = BouncyCastleExtensions.GetNonce(passwordBytes);
                 var encryptedWithBc = BouncyCastleExtensions.EncryptWithGcm(decBytes, aesStateKey, nonce);
                 var reDecryptedWithBc = BouncyCastleExtensions.DecryptWithGcm(encryptedWithBc, aesStateKey, nonce);
 
                 var en_good = Helpers.ByteArrayToString(passwordBytes);
+                var en_good2 = Helpers.ByteArrayToString(reEncrypted);
+
+                var passwordBytes2 = Chrome.DecryptAESChromeBlob(reEncrypted, hAlg, hKey, out var _);
+                var password2_utf = Encoding.UTF8.GetString(passwordBytes2);
+                var password2_ascii = Encoding.ASCII.GetString(passwordBytes2);
+
                 var en_reCreation = Helpers.ByteArrayToString(encryptedWithBc);
 
                 var de_good = Helpers.ByteArrayToString(decBytes);
@@ -112,5 +122,38 @@ namespace SharpChrome.Extensions
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double FromDateTimeToChromeTime(this DateTime dateTimeValue) => Helpers.ConvertToChromeTime(dateTimeValue);
+
+        /// <summary>
+        /// Concatenates the current array with the <paramref name="otherArray"/>, returning a new array.
+        /// <para>The current array begins the new array.</para>
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="array"></param>
+        /// <param name="otherArray"></param>
+        /// <returns></returns>
+        public static T[] ArrayConcat<T>(this T[] array, T[] otherArray)
+        {
+            T[] concatenated = new T[array.Length + otherArray.Length];
+            array.CopyTo(concatenated, 0);
+            otherArray.CopyTo(concatenated, array.Length);
+
+            return concatenated;
+        }
+
+        /// <summary>
+        /// Converts a <see cref="byte"/> pointer to a regular <see cref="byte"/> <see cref="Array"/>.
+        /// </summary>
+        /// <param name="bytePointer"></param>
+        /// <param name="arrayLength"></param>
+        /// <returns></returns>
+        public static unsafe byte[] ToByteArray(byte* bytePointer, int arrayLength)
+        {
+            if (arrayLength <= 0) throw new ArgumentOutOfRangeException(nameof(arrayLength));
+
+            var byteArray = new byte[arrayLength];
+            Marshal.Copy((IntPtr)bytePointer, byteArray, 0, arrayLength);
+
+            return byteArray;
+        }
     }
 }

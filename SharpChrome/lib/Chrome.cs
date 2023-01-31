@@ -436,7 +436,7 @@ namespace SharpChrome
                     if (aesStateKey != null)
                     {
                         // using the new DPAPI decryption method
-                        decBytes = DecryptAESChromeBlob(passwordBytes, hAlg, hKey);
+                        decBytes = DecryptAESChromeBlob(passwordBytes, hAlg, hKey, out _);
 
                         if (decBytes == null)
                         {
@@ -571,7 +571,7 @@ namespace SharpChrome
                         if (aesStateKey != null)
                         {
                             // using the new DPAPI decryption method
-                            decBytes = DecryptAESChromeBlob(valueBytes, hAlg, hKey);
+                            decBytes = DecryptAESChromeBlob(valueBytes, hAlg, hKey, out _);
 
                             if (decBytes == null)
                             {
@@ -867,7 +867,7 @@ namespace SharpChrome
 
         // adapted from https://github.com/djhohnstein/SharpChrome/blob/e287334c0592abb02bf4f45ada23fecaa0052d48/ChromeCredentialManager.cs#L136-L197
         // god bless you Dwight for figuring this out lol
-        public static byte[] DecryptAESChromeBlob(byte[] dwData, BCrypt.SafeAlgorithmHandle hAlg, BCrypt.SafeKeyHandle hKey)
+        public static byte[] DecryptAESChromeBlob(byte[] dwData, BCrypt.SafeAlgorithmHandle hAlg, BCrypt.SafeKeyHandle hKey, out byte[] iv)
         {
             // magic decryption happens here
 
@@ -878,6 +878,11 @@ namespace SharpChrome
             uint ntStatus;
             byte[] subArrayNoV10;
             int pcbResult = 0;
+
+            #region Copy IV
+            iv = new byte[12];
+            Array.Copy(dwData, 3, iv, 0, 12);
+            #endregion
 
             unsafe
             {

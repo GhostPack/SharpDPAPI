@@ -10,7 +10,7 @@ namespace SharpChrome
     public partial class BCrypt
     {
         /// <summary>
-        /// 
+        /// Encrypts data using the Bcrypt API.
         /// </summary>
         /// <param name="hKey">
         ///     <para>[in, out] hKey: The handle of the key to use to encrypt the data. This handle is obtained from one of the key creation functions, such as BCryptGenerateSymmetricKey, BCryptGenerateKeyPair, or BCryptImportKey.</para>
