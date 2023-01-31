@@ -18,6 +18,7 @@ namespace SharpChrome
         internal static byte[] DPAPI_HEADER = UTF8Encoding.UTF8.GetBytes("DPAPI");
         internal static byte[] DPAPI_CHROME_UNKV10 = UTF8Encoding.UTF8.GetBytes("v10");
         internal const int AES_BLOCK_SIZE = 16;
+        internal const int GCM_INITIALIZATION_VECTOR_SIZE = 12;
 
         // approach adapted from @djhohnstein's https://github.com/djhohnstein/SharpChrome/ project
         //  but using this CSHARP-SQLITE version https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp
@@ -867,7 +868,8 @@ namespace SharpChrome
 
         // adapted from https://github.com/djhohnstein/SharpChrome/blob/e287334c0592abb02bf4f45ada23fecaa0052d48/ChromeCredentialManager.cs#L136-L197
         // god bless you Dwight for figuring this out lol
-        public static byte[] DecryptAESChromeBlob(byte[] dwData, BCrypt.SafeAlgorithmHandle hAlg, BCrypt.SafeKeyHandle hKey, out byte[] iv)
+        public static byte[] DecryptAESChromeBlob(byte[] dwData, BCrypt.SafeAlgorithmHandle hAlg, BCrypt.SafeKeyHandle hKey, 
+            out byte[] iv)
         {
             // magic decryption happens here
 

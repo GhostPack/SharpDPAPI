@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Security.Policy;
 using System.Text;
 using SharpChrome.Extensions;
+using SharpDPAPI;
 using SQLite;
 
 namespace SharpChrome
@@ -250,10 +251,11 @@ namespace SharpChrome
         /// <param name="ewData">Data to encrypt</param>
         /// <param name="hAlg"></param>
         /// <param name="hKey"></param>
-        /// <param name="iv"></param>
+        /// <param name="passwordSegments"></param>
         /// <returns></returns>
-        public static byte[] EncryptAESChromeBlob(byte[] ewData, BCrypt.SafeAlgorithmHandle hAlg, BCrypt.SafeKeyHandle hKey, byte[] iv)
+        public static byte[] EncryptAESChromeBlob(byte[] ewData, BCrypt.SafeAlgorithmHandle hAlg, BCrypt.SafeKeyHandle hKey, BinaryChromePass passwordSegments)
         {
+            byte[] iv = passwordSegments.InitVector;
             byte[] ewDataOut = null;
             BCrypt.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO info;
             unsafe {
@@ -266,25 +268,19 @@ namespace SharpChrome
             int edwDataOutLen;
             IntPtr pData = IntPtr.Zero;
             uint ntStatus;
-            byte[] subArrayNoV10;
             int pcbResult = 0;
 
             unsafe
             {
                 if (!SharpDPAPI.Helpers.ByteArrayEquals(ewData, 0, DPAPI_CHROME_UNKV10, 0, 3)) {
-                    byte[] dwDataWithHeader = DPAPI_CHROME_UNKV10.ArrayConcat(ewData);
-                    
-                    Debug.Assert(dwDataWithHeader.Length == (ewData.Length + DPAPI_CHROME_UNKV10.Length));
-                    
                     pData = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(byte)) * ewData.Length);
 
-                    try
-                    {
+                    try {
                         Marshal.Copy(ewData, 0, pData, ewData.Length);
                         BCrypt.BCRYPT_INIT_AUTH_MODE_INFO(out info);
-                        //info.pbNonce = (byte*)(new IntPtr(pData.ToInt64() + DPAPI_CHROME_UNKV10.Length));
-                        info.pbNonce = (byte*)(new IntPtr(pData.ToInt64()));
-                        info.cbNonce = 12;
+                        info.pbNonce = (byte*)(new IntPtr(pData.ToInt64() + DPAPI_CHROME_UNKV10.Length));
+                        //info.pbNonce = (byte*)(new IntPtr(pData.ToInt64()));
+                        info.cbNonce = GCM_INITIALIZATION_VECTOR_SIZE;
                         info.pbTag = info.pbNonce + ewData.Length - (DPAPI_CHROME_UNKV10.Length + AES_BLOCK_SIZE); // AES_BLOCK_SIZE = 16
                         //info.pbTag = info.pbNonce + ewData.Length - (AES_BLOCK_SIZE); // AES_BLOCK_SIZE = 16
                         info.cbTag = AES_BLOCK_SIZE; // AES_BLOCK_SIZE = 16
@@ -293,11 +289,13 @@ namespace SharpChrome
                         edwDataOutLen = ewData.Length;
                         ewDataOut = new byte[edwDataOutLen];
                         
+                        fixed (byte* pEwData = ewData)
                         fixed (byte* pIv = iv)
                         fixed (byte* pDataOut = ewDataOut)
                         {
                             ntStatus = BCrypt.BCryptEncrypt(hKey: hKey,
-                                pbInput: info.pbNonce + info.cbNonce,
+                                //pbInput: info.pbNonce + info.cbNonce,
+                                pbInput: pEwData,
                                 cbInput: edwDataOutLen,
                                 pPaddingInfo: (void*)&info,
                                 pbIV: pIv,
@@ -310,7 +308,7 @@ namespace SharpChrome
 
                         if (ntStatus != 0)
                         {
-                            Console.WriteLine("[X] Error : {0}", SharpDPAPI.Interop.GetLastError());
+                            Console.WriteLine("[X] Error : {0}", Interop.GetLastError());
                         }
                     }
                     catch (Exception ex)
@@ -344,6 +342,10 @@ namespace SharpChrome
                     throw new Exception($"BCrypt.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO info.{nameof(info.pbNonce)} wasn't properly initialised!");
 
                 var eIv = GeneralExtensions.ToByteArray(info.pbNonce, info.cbNonce);
+                var eIvStr = Helpers.ByteArrayToString(eIv);
+                var ivStr = Helpers.ByteArrayToString(iv);
+                ;
+                
                 var pbTagBytes = GeneralExtensions.ToByteArray(info.pbTag, info.cbTag);
 
                 var v10HeaderAndIv = DPAPI_CHROME_UNKV10.ArrayConcat(iv);

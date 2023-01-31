@@ -85,9 +85,11 @@ namespace SharpChrome.Extensions
                     decBytes = Dpapi.DescribeDPAPIBlob(blobBytes: passwordBytes, MasterKeys: masterKeys, blobType: "chrome");
                 }
 
+                var chromePasswordSegments = passwordBytes.ToSegmentedChromePass();
                 password = Encoding.ASCII.GetString(decBytes);
 
-                byte[] reEncrypted = Chrome.EncryptAESChromeBlob(decBytes, hAlg, hKey, iv);
+                byte[] reEncrypted = Chrome.EncryptAESChromeBlob(decBytes, hAlg, hKey, chromePasswordSegments);
+                byte[] reEncrypted2 = Chrome.EncryptAESChromeBlob(decBytes, hAlg, hKey, chromePasswordSegments);
 
                 var nonce = BouncyCastleExtensions.GetNonce(passwordBytes);
                 var encryptedWithBc = BouncyCastleExtensions.EncryptWithGcm(decBytes, aesStateKey, nonce);
@@ -95,6 +97,7 @@ namespace SharpChrome.Extensions
 
                 var en_good = Helpers.ByteArrayToString(passwordBytes);
                 var en_good2 = Helpers.ByteArrayToString(reEncrypted);
+                var en_good2b = Helpers.ByteArrayToString(reEncrypted);
 
                 var passwordBytes2 = Chrome.DecryptAESChromeBlob(reEncrypted, hAlg, hKey, out var _);
                 var password2_utf = Encoding.UTF8.GetString(passwordBytes2);
@@ -155,5 +158,39 @@ namespace SharpChrome.Extensions
 
             return byteArray;
         }
+
+        public static BinaryChromePass ToSegmentedChromePass(this byte[] encryptedBytes)
+        {
+            var v10HeaderLength = 3;
+            var header = encryptedBytes.Take(v10HeaderLength).ToArray();
+            var initVector = encryptedBytes.Skip(v10HeaderLength).Take(Chrome.GCM_INITIALIZATION_VECTOR_SIZE).ToArray();
+            var password = encryptedBytes.Skip(v10HeaderLength + Chrome.GCM_INITIALIZATION_VECTOR_SIZE).Take(10)
+                .ToArray();
+            var tag = encryptedBytes.Skip(v10HeaderLength + Chrome.GCM_INITIALIZATION_VECTOR_SIZE + password.Length).ToArray();
+            var tagShouldBeLast16 = encryptedBytes.TakeLast(16).ToArray();
+
+            var sequenceEqual = tag.SequenceEqual(tagShouldBeLast16);
+            Debug.Assert(sequenceEqual);
+
+            return new BinaryChromePass() {
+                Header = header,
+                InitVector = initVector,
+                Password = password,
+                Tag = tag
+            };
+        }
+
+        public static IEnumerable<T> TakeLast<T>(this IEnumerable<T> source, int N)
+        {
+            return source.Skip(Math.Max(0, source.Count() - N));
+        }
+    }
+
+    public class BinaryChromePass
+    {
+        public byte[] Header { get; set; }
+        public byte[] InitVector { get; set; }
+        public byte[] Password { get; set; }
+        public byte[] Tag { get; set; }
     }
 }

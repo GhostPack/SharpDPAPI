@@ -100,6 +100,7 @@
     <Compile Include="Domain\ArgumentParserResult.cs" />
     <Compile Include="Domain\CommandCollection.cs" />
     <Compile Include="Domain\Info.cs" />
+    <Compile Include="Extensions\AESGCMBCrypt.cs" />
     <Compile Include="Extensions\BouncyCastleExtensions.cs" />
     <Compile Include="Extensions\GeneralExtensions.cs" />
     <Compile Include="lib\Bcrypt.cs" />
