@@ -5,11 +5,10 @@ using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Runtime.InteropServices;
+using System.Linq;
 using System.Security.Policy;
 using System.Text;
 using SharpChrome.Extensions;
-using SharpDPAPI;
 using SQLite;
 
 namespace SharpChrome
@@ -137,6 +136,7 @@ namespace SharpChrome
     }
 
     [SuppressMessage("ReSharper", "UnusedMember.Global"), SuppressMessage("ReSharper", "InconsistentNaming")]
+    [DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
     public class logins
     {
         private string _decryptedPasswordValue;
@@ -176,6 +176,23 @@ namespace SharpChrome
         public string decrypted_password_value => _decryptedPasswordValue;
 
         public void setDecrypted_password_value(string value) => _decryptedPasswordValue = value;
+
+        private string GetDebuggerDisplay() => ToString();
+
+        public override string ToString()
+        {
+            var debugStr = $"username = {username_value}, website = {new Uri(origin_url).Host}";
+            if (!string.IsNullOrEmpty(decrypted_password_value)) {
+                debugStr += $", pass = {decrypted_password_value}";
+            }
+
+            return debugStr;
+        }
+
+        public BinaryChromePass ToBinaryChromePass()
+        {
+            return password_value?.ToSegmentedChromePass();
+        }
     }
 
     internal partial class Chrome
@@ -252,7 +269,7 @@ namespace SharpChrome
         /// <param name="aesEncryptionKey"></param>
         /// <param name="chPass"></param>
         /// <returns></returns>
-        public static byte[] EncryptAESChromeBlob2(byte[] dataToEncrypt, byte[] aesEncryptionKey, BinaryChromePass chPass)
+        public static byte[] EncryptAESChromeBlob(byte[] dataToEncrypt, byte[] aesEncryptionKey, BinaryChromePass chPass)
         {
             var encrypted = AESGCM.GcmEncrypt(dataToEncrypt, aesEncryptionKey, chPass.InitVector, chPass.Tag);
 
@@ -261,117 +278,6 @@ namespace SharpChrome
             var v10HeaderAndIvAndEncryptedDataAndTag = v10HeaderAndIvAndEncryptedData.ArrayConcat(chPass.Tag);
                 
             return v10HeaderAndIvAndEncryptedDataAndTag;
-        }
-
-        /// <summary>
-        /// adapted from https://github.com/djhohnstein/SharpChrome/blob/e287334c0592abb02bf4f45ada23fecaa0052d48/ChromeCredentialManager.cs#L136-L197
-        /// </summary>
-        /// <param name="ewData">Data to encrypt</param>
-        /// <param name="hAlg"></param>
-        /// <param name="hKey"></param>
-        /// <param name="passwordSegments"></param>
-        /// <returns></returns>
-        public static byte[] EncryptAESChromeBlob(byte[] ewData, BCrypt.SafeAlgorithmHandle hAlg, BCrypt.SafeKeyHandle hKey, BinaryChromePass passwordSegments)
-        {
-            byte[] iv = passwordSegments.InitVector;
-            byte[] ewDataOut = null;
-            BCrypt.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO info;
-            unsafe {
-                info.cbTag = 0;
-                info.pbTag = default(byte*);
-
-                info.cbNonce = 0;
-                info.pbNonce = default(byte*);
-            }
-            int edwDataOutLen;
-            IntPtr pData = IntPtr.Zero;
-            uint ntStatus;
-            int pcbResult = 0;
-
-            unsafe
-            {
-                if (!SharpDPAPI.Helpers.ByteArrayEquals(ewData, 0, DPAPI_CHROME_UNKV10, 0, 3)) {
-                    pData = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(byte)) * ewData.Length);
-
-                    try {
-                        Marshal.Copy(ewData, 0, pData, ewData.Length);
-                        BCrypt.BCRYPT_INIT_AUTH_MODE_INFO(out info);
-                        info.pbNonce = (byte*)(new IntPtr(pData.ToInt64() + DPAPI_CHROME_UNKV10.Length));
-                        //info.pbNonce = (byte*)(new IntPtr(pData.ToInt64()));
-                        info.cbNonce = GCM_INITIALIZATION_VECTOR_SIZE;
-                        info.pbTag = info.pbNonce + ewData.Length - (DPAPI_CHROME_UNKV10.Length + AES_BLOCK_SIZE); // AES_BLOCK_SIZE = 16
-                        //info.pbTag = info.pbNonce + dataToEncrypt.Length - (AES_BLOCK_SIZE); // AES_BLOCK_SIZE = 16
-                        info.cbTag = AES_BLOCK_SIZE; // AES_BLOCK_SIZE = 16
-                        //edwDataOutLen = dataToEncrypt.Length + DPAPI_CHROME_UNKV10.Length + info.cbNonce + info.cbTag;
-                        //edwDataOutLen = dataToEncrypt.Length + info.cbNonce + info.cbTag;
-                        edwDataOutLen = ewData.Length;
-                        ewDataOut = new byte[edwDataOutLen];
-                        
-                        fixed (byte* pEwData = ewData)
-                        fixed (byte* pIv = iv)
-                        fixed (byte* pDataOut = ewDataOut)
-                        {
-                            ntStatus = BCrypt.BCryptEncrypt(hKey: hKey,
-                                //pbInput: info.pbNonce + info.cbNonce,
-                                pbInput: pEwData,
-                                cbInput: edwDataOutLen,
-                                pPaddingInfo: (void*)&info,
-                                pbIV: pIv,
-                                cbIV: (iv?.Length).GetValueOrDefault(),
-                                pbOutput: pDataOut,
-                                cbOutput: edwDataOutLen,
-                                pcbResult: out pcbResult,
-                                dwFlags: 0);
-                        }
-
-                        if (ntStatus != 0)
-                        {
-                            Console.WriteLine("[X] Error : {0}", Interop.GetLastError());
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("Exception : {0}", ex.Message);
-                    }
-                    // this block for decryption
-                    //finally
-                    //{
-                    //    if (pData != null && pData != IntPtr.Zero)
-                    //        Marshal.FreeHGlobal(pData);
-                    //}
-                }
-                else
-                {
-                    Console.WriteLine("[X] Data header not equal to DPAPI_CHROME_UNKV10");
-                }
-            }
-            
-            if (info.cbTag == default)
-                throw new Exception("BCrypt.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO info.cbTag wasn't properly initialised!");
-            
-            if (info.cbNonce == default)
-                throw new Exception($"BCrypt.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO info.{nameof(info.cbNonce)} wasn't properly initialised!");
-
-            unsafe {
-                if (info.pbTag == default(byte*))
-                    throw new Exception("BCrypt.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO info.pbTag wasn't properly initialised!");
-
-                if (info.pbNonce == default(byte*))
-                    throw new Exception($"BCrypt.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO info.{nameof(info.pbNonce)} wasn't properly initialised!");
-
-                var eIv = GeneralExtensions.ToByteArray(info.pbNonce, info.cbNonce);
-                var eIvStr = Helpers.ByteArrayToString(eIv);
-                var ivStr = Helpers.ByteArrayToString(iv);
-                ;
-                
-                var pbTagBytes = GeneralExtensions.ToByteArray(info.pbTag, info.cbTag);
-
-                var v10HeaderAndIv = DPAPI_CHROME_UNKV10.ArrayConcat(iv);
-                var v10HeaderAndIvAndEncryptedData = v10HeaderAndIv.ArrayConcat(ewDataOut);
-                var v10HeaderAndIvAndEncryptedDataAndTag = v10HeaderAndIvAndEncryptedData.ArrayConcat(pbTagBytes);
-                
-                return v10HeaderAndIvAndEncryptedDataAndTag;
-            }
         }
     }
 }
