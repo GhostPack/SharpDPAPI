@@ -1,5 +1,4 @@
-﻿#define DEBUG
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
@@ -204,20 +203,16 @@ namespace SharpChrome
                 return default;
             }
 
-            BCrypt.SafeAlgorithmHandle hAlg = null;
-            BCrypt.SafeKeyHandle hKey = null;
-
             if (aesStateKey != null) {
                 // initialize the BCrypt key using the new DPAPI decryption method
-                DPAPIChromeAlgKeyFromRaw(aesStateKey, out hAlg, out hKey);
+                DPAPIChromeAlgKeyFromRaw(aesStateKey, out var hAlg, out var hKey);
             }
 
             // convert to a file:/// uri path type so we can do lockless opening
             //  ref - https://github.com/gentilkiwi/mimikatz/pull/199
             var uri = new System.Uri(loginDataFilePath);
             string loginDataFilePathUri = $"{uri.AbsoluteUri}?nolock=1";
-
-            bool someResults = false;
+            
             SQLiteConnection database = null;
 
             try {
@@ -228,12 +223,8 @@ namespace SharpChrome
                 Console.WriteLine("[X] {0}", e.InnerException.Message);
                 return default;
             }
-
-            string discriminatingQuery =
-                "SELECT signon_realm, origin_url, username_value, password_value, times_used, cast(date_created as text) as date_created FROM logins";
+            
             string everyColQuery = "SELECT * FROM logins";
-
-            List<SQLiteQueryRow> results = database.Query2(everyColQuery, false);
             
             List<logins> allLogins = database.Query<logins>(everyColQuery, false);
             var allLoginsDecryptedPwd = allLogins.DecryptPasswords(aesStateKey);
@@ -263,7 +254,7 @@ namespace SharpChrome
         }
 
         /// <summary>
-        /// 
+        /// Encrypts data for saving inside Chromium's 'Login Data' database file.
         /// </summary>
         /// <param name="dataToEncrypt">Data to encrypt</param>
         /// <param name="aesEncryptionKey"></param>
