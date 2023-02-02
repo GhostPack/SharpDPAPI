@@ -545,7 +545,7 @@ namespace SharpChrome
             //string query = "SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, is_secure, is_httponly, cast(last_access_utc as text) as last_access_utc, encrypted_value FROM cookies";
             
             // new, seems to work with partial indexing?? "/giphy table flip"
-            string query = "SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, cast(last_access_utc as text) as last_access_utc, encrypted_value FROM cookies";
+            string query = "SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, cast(last_access_utc as text) as last_access_utc, encrypted_value, samesite, is_secure, is_httponly FROM cookies";
             List<SQLiteQueryRow> results = database.Query2(query, false);
 
             // used if cookies "never expire" for json output
@@ -553,6 +553,7 @@ namespace SharpChrome
             TimeSpan timespan = (DateTime.Now).AddYears(100) - epoch;
             long longExpiration = (long)Math.Abs(timespan.TotalSeconds * 1000000);
 
+            int idInt = 1;
             foreach (SQLiteQueryRow row in results)
             {
                 try
@@ -593,6 +594,41 @@ namespace SharpChrome
                     double expDateDouble = 0;
                     long expDate;
                     Int64.TryParse(row.column[4].Value.ToString(), out expDate);
+                    int sameSite = -1;
+                    int.TryParse(row.column[7].Value.ToString(), out sameSite);
+
+                    if (!int.TryParse(row.column[8].Value.ToString(), out int isSecure))
+                    {
+                        throw new Exception($"Failed to parse int from {row.column[8].Value}");
+                    }
+
+                    string secureFlag = isSecure > 0 ? "true" : "false";
+                    
+                    if (!int.TryParse(row.column[9].Value.ToString(), out int isHttpOnly))
+                    {
+                        throw new Exception($"Failed to parse int from {row.column[8].Value}");
+                    }
+
+                    string httpOnly = isHttpOnly > 0 ? "true" : "false";
+                    
+                    string sameSiteString = "";
+                    switch (sameSite)
+                    {
+                        case -1:
+                            sameSiteString = "unspecified";
+                            break;
+                        case 0:
+                            sameSiteString = "no_restriction";
+                            break;
+                        case 1:
+                            sameSiteString = "lax";
+                            break;
+                        case 2:
+                            sameSiteString = "strict";
+                            break;
+                        default:
+                            throw new Exception($"Unexpected SameSite value {sameSite}");
+                    }
                     // https://github.com/djhohnstein/SharpChrome/issues/1
                     if ((expDate / 1000000.000000000000) - 11644473600 > 0)
                         expDateDouble = (expDate / 1000000.000000000000000) - 11644473600;
@@ -678,15 +714,16 @@ namespace SharpChrome
                                     Console.WriteLine("    \"expirationDate\": {0},", expDateDouble);
                                 }
                             }
-                            Console.WriteLine("    \"hostOnly\": false,");
-                            Console.WriteLine("    \"httpOnly\": true,");
+                            Console.WriteLine($"    \"hostOnly\": false,");
+                            Console.WriteLine($"    \"httpOnly\": {httpOnly},");
                             Console.WriteLine("    \"name\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(String.Format("{0}", row.column[2].Value)));
                             Console.WriteLine("    \"path\": \"{0}\",", String.Format("{0}", row.column[3].Value));
-                            Console.WriteLine("    \"sameSite\": \"no_restriction\",");
-                            Console.WriteLine("    \"secure\": true,");
+                            Console.WriteLine($"    \"sameSite\": \"{sameSiteString}\",");
+                            Console.WriteLine($"    \"secure\": {secureFlag},");
                             Console.WriteLine("    \"session\": true,");
-                            Console.WriteLine("    \"storeId\": null,");
+                            Console.WriteLine("    \"storeId\": \"0\",");
                             Console.WriteLine("    \"value\": \"{0}\"", SharpDPAPI.Helpers.CleanForJSON(value));
+                            // Console.WriteLine($"    \"");
                         }
                         else
                         {
