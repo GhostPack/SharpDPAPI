@@ -166,7 +166,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /target:FILE        -   triage a specific 'Cookies', 'Login Data', or 'Local State' file location
             /target:C:\Users\X\ -   triage a specific user folder for any specified command
             /server:SERVER      -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
-            /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'edge'
+            /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'chromium', 'edge', 'brave'
 
         Output:
             /format:X           -   either 'csv' (default) or 'table' display

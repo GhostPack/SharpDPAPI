@@ -117,6 +117,11 @@ namespace SharpChrome
                     loginDataPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data", userDirectory);
                     aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", userDirectory);
                 }
+                else if (browser.ToLower() == "chromium")
+                {
+                    loginDataPath = String.Format("{0}\\AppData\\Local\\Chromium\\User Data\\Default\\Login Data", userDirectory);
+                    aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Chromium\\User Data\\Local State", userDirectory);
+                }
                 else if (browser.ToLower() == "edge")
                 {
                     loginDataPath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data", userDirectory);
@@ -129,7 +134,7 @@ namespace SharpChrome
                 }
                 else
                 {
-                    Console.WriteLine("[X] ERROR: only 'chrome', 'edge', and 'brave' are currently supported for browsers.");
+                    Console.WriteLine("[X] ERROR: only 'chrome', 'chromium', 'edge', and 'brave' are currently supported for browsers.");
                     return;
                 }
 
@@ -248,6 +253,15 @@ namespace SharpChrome
                     }
                     aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State", userDirectory);
                 }
+                else if (browser.ToLower() == "chromium")
+                {
+                    cookiePath = String.Format("{0}\\AppData\\Local\\Chromium\\User Data\\Default\\Cookies", userDirectory);
+                    if (!File.Exists(cookiePath))
+                    {
+                        cookiePath = String.Format("{0}\\AppData\\Local\\Chromium\\User Data\\Default\\Network\\Cookies", userDirectory);
+                    }
+                    aesStateKeyPath = String.Format("{0}\\AppData\\Local\\Chromium\\User Data\\Local State", userDirectory);
+                }
                 else if (browser.ToLower() == "edge")
                 {
                     cookiePath = String.Format("{0}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies", userDirectory);
@@ -268,7 +282,7 @@ namespace SharpChrome
                 }
                 else
                 {
-                    Console.WriteLine("[X] ERROR: only 'chrome', 'edge', and 'brave' are currently supported for browsers.");
+                    Console.WriteLine("[X] ERROR: only 'chrome', 'chromium', 'edge', and 'brave' are currently supported for browsers.");
                     return;
                 }
 
@@ -362,6 +376,7 @@ namespace SharpChrome
                 string[] aesKeyPaths = new string[]
                 {
                     $"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State",
+                    $"{userDirectory}\\AppData\\Local\\Chromium\\User Data\\Local State",
                     $"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State",
                     $"{userDirectory}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State"
                 };
