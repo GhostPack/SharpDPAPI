@@ -83,6 +83,9 @@
     <Compile Include="..\SharpDPAPI\lib\Tuple.cs">
       <Link>lib\Tuple.cs</Link>
     </Compile>
+    <Compile Include="..\SharpDPAPI\lib\Bkrp.cs">
+      <Link>lib\Bkrp.cs</Link>
+    </Compile>
     <Compile Include="Commands\Backupkey.cs" />
     <Compile Include="Commands\Cookies.cs" />
     <Compile Include="Commands\ICommand.cs" />
@@ -93,7 +96,6 @@
     <Compile Include="Domain\CommandCollection.cs" />
     <Compile Include="Domain\Info.cs" />
     <Compile Include="lib\Bcrypt.cs" />
-    <Compile Include="lib\Bkrp.cs" />
     <Compile Include="lib\Chrome.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -207,9 +207,9 @@ namespace SharpDPAPI
                                     DomainController dc = DomainController.FindOne(mycontext);
                                     IPAddress DCIPAdress = IPAddress.Parse(dc.IPAddress);
 
-                                    var d = new Bkrp();
-                                    d.Initialize(DCIPAdress.ToString(), System.Environment.UserDomainName);
-                                    var keyBytes = d.BackuprKey(SharpDPAPI.Dpapi.GetDomainKey(masterKeyBytes));
+                                    var bkrp = new Bkrp();
+                                    bkrp.Initialize(DCIPAdress.ToString(), System.Environment.UserDomainName);
+                                    var keyBytes = bkrp.BackuprKey(SharpDPAPI.Dpapi.GetDomainKey(masterKeyBytes));
                                     var guid = $"{{{Encoding.Unicode.GetString(masterKeyBytes, 12, 72)}}}";
                                     var sha1 = new SHA1Managed();
                                     var masterKeySha1 = sha1.ComputeHash(keyBytes);
