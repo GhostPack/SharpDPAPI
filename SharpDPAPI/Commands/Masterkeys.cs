@@ -1,6 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.DirectoryServices.ActiveDirectory;
 using System.IO;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace SharpDPAPI.Commands
 {
@@ -15,6 +20,7 @@ namespace SharpDPAPI.Commands
             byte[] backupKeyBytes;
             string password;
             Dictionary<string, string> mappings = new Dictionary<string, string>();
+
 
             if (arguments.ContainsKey("/pvk"))
             {
@@ -92,6 +98,10 @@ namespace SharpDPAPI.Commands
                 {
                     mappings = Triage.TriageUserMasterKeys(null, true, "", "", "", "", true);
                 }
+            }
+            else if (arguments.ContainsKey("/rpc"))
+            {
+                mappings = Triage.TriageUserMasterKeys(null, rpc: true);
             }
             else
             {

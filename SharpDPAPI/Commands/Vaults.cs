@@ -52,6 +52,10 @@ namespace SharpDPAPI.Commands
                     masterkeys = Triage.TriageUserMasterKeys(null, true, "", password);
                 }
             }
+            else if (arguments.ContainsKey("/rpc"))
+            {
+                masterkeys = Triage.TriageUserMasterKeys(null, rpc: true);
+            }
 
             if (arguments.ContainsKey("/target"))
             {

@@ -37,6 +37,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -53,6 +54,8 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.DirectoryServices" />
+    <Reference Include="System.DirectoryServices.AccountManagement" />
     <Reference Include="System.Management" />
     <Reference Include="System.Security" />
     <Reference Include="System.Xml.Linq" />
@@ -83,6 +86,7 @@
     <Compile Include="Domain\CommandCollection.cs" />
     <Compile Include="Domain\Info.cs" />
     <Compile Include="Domain\Version.cs" />
+    <Compile Include="lib\Bkrp.cs" />
     <Compile Include="lib\Backup.cs" />
     <Compile Include="lib\BigInteger.cs" />
     <Compile Include="lib\Certificate.cs" />
