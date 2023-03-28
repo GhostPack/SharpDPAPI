@@ -1,20 +1,6 @@
-﻿using Microsoft.Win32.SafeHandles;
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Globalization;
-using System.IO;
-using System.Net;
-using System.Net.Sockets;
-using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
-using System.Security;
-using System.Security.Cryptography;
-using System.Security.Permissions;
-using System.Security.Principal;
-using System.Text;
 
 namespace SharpDPAPI
 {
@@ -347,27 +333,6 @@ namespace SharpDPAPI
             RpcBindingFree(ref hBinding);
         }
 
-        private byte[] SessionKey;
-
-        SecurityCallbackDelegate securityCallbackDelegate;
-        private delegate void SecurityCallbackDelegate(IntPtr context);
-        private void SecurityCallback(IntPtr context)
-        {
-            IntPtr SecurityContextHandle;
-            SecPkgContext_SessionKey sessionKey = new SecPkgContext_SessionKey();
-
-            int res = I_RpcBindingInqSecurityContext(context, out SecurityContextHandle);
-            if (res == 0)
-            {
-                res = QueryContextAttributes(SecurityContextHandle, 9, ref sessionKey);
-                if (res == 0)
-                {
-                    SessionKey = new byte[sessionKey.SessionKeyLength];
-                    Marshal.Copy(sessionKey.SessionKey, SessionKey, 0, (int)sessionKey.SessionKeyLength);
-                }
-            }
-        }
-
         private IntPtr GetProcStringHandle(int offset)
         {
             return Marshal.UnsafeAddrOfPinnedArrayElement(MIDL_ProcFormatStringBackuprKeyx64, offset);
@@ -462,13 +427,12 @@ namespace SharpDPAPI
             }
             else
             {
-                InitializeStub(this.MS_BKRP_INTERFACE_ID, MIDL_ProcFormatStringBackuprKeyx86, MIDL_TypeFormatStringBackuprKeyx86, 4, 0);
+                InitializeStub(this.MS_BKRP_INTERFACE_ID, MIDL_ProcFormatStringBackuprKeyx86, MIDL_TypeFormatStringBackuprKeyx86, 1, 0);
             }
         }
 
         ~Bkrp()
         {
-            freeStub();
             Uninitialize();
         }
 
@@ -480,7 +444,7 @@ namespace SharpDPAPI
                 if (this.hBind == IntPtr.Zero)
                     throw new Exception("Unable to connect to the server " + server);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 if (this.hBind != IntPtr.Zero)
                     Unbind(this.hBind);
@@ -524,7 +488,7 @@ namespace SharpDPAPI
                 Marshal.Copy(ptr, managedArray, 0, 64);
                 return managedArray;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 throw new Exception("Error decrypting masterkey via RPC");
             }
@@ -535,7 +499,6 @@ namespace SharpDPAPI
                 this.freeStub();
                 FreeTrackedMemoryAndRemoveTracking();
             }
-            return null;
         }
         #endregion
     }

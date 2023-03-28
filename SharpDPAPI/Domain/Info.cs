@@ -47,6 +47,7 @@ User Triage:
         /pvk:key.pvk            -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
         /password:X             -   first decrypt the current user's masterkeys using a plaintext password (works remotely)
         /server:SERVER          -   triage a remote server, assuming admin access
+        /rpc                    -   attempt to decrypt user masterkeys by asking domaine controller to do so
 
 
     Arguments for the credentials|vaults|rdg|keepass|triage|blob|ps commands:
@@ -58,6 +59,7 @@ User Triage:
             /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
             /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
             /pvk:key.pvk        -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+            /rpc                    -   attempt to decrypt user masterkeys by asking domaine controller to do so
 
         Targeting:
             /target:FILE/folder -   triage a specific 'Credentials','.rdg|RDCMan.settings', 'blob', or 'ps' file location, or 'Vault' folder

@@ -101,6 +101,7 @@ namespace SharpDPAPI.Commands
             }
             else if (arguments.ContainsKey("/rpc"))
             {
+                Console.WriteLine("[*] Will ask domain controller to decrypt masterkey for us\r\n");
                 mappings = Triage.TriageUserMasterKeys(null, rpc: true);
             }
             else
