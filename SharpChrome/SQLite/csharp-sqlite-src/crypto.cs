@@ -163,9 +163,9 @@ static void CODEC_TRACE( string T, params object[] ap ) { if ( sqlite3PagerTrace
     const int CIPHER_ENCRYPT = 1;        //#define CIPHER_ENCRYPT 1
 
 #if NET_2_0
-    static RijndaelManaged Aes = new RijndaelManaged();
+    static RijndaelCryptoServiceProvider Aes = new RijndaelCryptoServiceProvider();
 #else
-    static AesManaged Aes = new AesManaged();
+    static AesCryptoServiceProvider Aes = new AesCryptoServiceProvider();
 #endif
 
     /* BEGIN CRYPTO */
