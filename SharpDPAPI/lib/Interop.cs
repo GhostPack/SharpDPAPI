@@ -573,5 +573,8 @@ namespace SharpDPAPI
                 return "";
             }
         }
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool CopyFile(string lpExistingFileName, string lpNewFileName, bool bFailIfExists);
     }
 }

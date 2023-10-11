@@ -97,6 +97,7 @@
     <Compile Include="Domain\Info.cs" />
     <Compile Include="lib\Bcrypt.cs" />
     <Compile Include="lib\Chrome.cs" />
+    <Compile Include="lib\Vsscopy.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SQLite\csharp-sqlite-src\alter_c.cs" />

