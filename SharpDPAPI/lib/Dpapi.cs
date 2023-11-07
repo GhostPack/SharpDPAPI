@@ -1753,7 +1753,7 @@ namespace SharpDPAPI
             if (!domain)
             {
                 //Calculate SHA1 from user password
-                using (var sha1 = new SHA1Managed())
+                using (var sha1 = new SHA1CryptoServiceProvider())
                 {
                     sha1bytes_password = sha1.ComputeHash(utf16pass);
                 }
@@ -1848,7 +1848,7 @@ namespace SharpDPAPI
             var masterKey = new byte[masterKeyLen];
             Buffer.BlockCopy(domainKeyBytesDec, 8, masterKey, 0, masterKeyLen);
 
-            var sha1 = new SHA1Managed();
+            var sha1 = new SHA1CryptoServiceProvider();
             var masterKeySha1 = sha1.ComputeHash(masterKey);
             var masterKeySha1Hex = BitConverter.ToString(masterKeySha1).Replace("-", "");
 
@@ -1947,7 +1947,7 @@ namespace SharpDPAPI
 
         private static byte[] DecryptAes256HmacSha512(byte[] shaBytes, byte[] final, byte[] encData)
         {
-            var aesCryptoProvider = new AesManaged();
+            var aesCryptoProvider = new AesCryptoServiceProvider();
 
             var ivBytes = new byte[16];
             Array.Copy(final, 32, ivBytes, 0, 16);
@@ -1965,7 +1965,7 @@ namespace SharpDPAPI
             var masterKeyFull = new byte[64];
             Array.Copy(plaintextBytes, plaintextBytes.Length - masterKeyFull.Length, masterKeyFull, 0, masterKeyFull.Length);
 
-            using (var sha1 = new SHA1Managed())
+            using (var sha1 = new SHA1CryptoServiceProvider())
             {
                 var masterKeySha1 = sha1.ComputeHash(masterKeyFull);
 
@@ -1995,7 +1995,7 @@ namespace SharpDPAPI
             var masterKeyFull = new byte[64];
             Array.Copy(plaintextBytes, plaintextBytes.Length - masterKeyFull.Length, masterKeyFull, 0, masterKeyFull.Length);
 
-            using (var sha1 = new SHA1Managed())
+            using (var sha1 = new SHA1CryptoServiceProvider())
             {
                 var masterKeySha1 = sha1.ComputeHash(masterKeyFull);
 
