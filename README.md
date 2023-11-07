@@ -1311,7 +1311,7 @@ The **cookies** command also has `/cookie:REGEX` and `/url:REGEX` arguments to o
 
 ### statekeys
 
-The **statekeys** command will search for Chrome/Edge AES statekey files (i.e. 'AppData\Local\Google\Chrome\User Data\Local State' and 'AppData\Local\Microsoft\Edge\User Data\Local State') and decrypts them using the same type of arguments that can be supplied for `cookies` and `logins`.
+By default, the **statekeys** command will search for Chromium-based browsers' (Chrome, Edge, and Brave) AES statekey files (e.g., 'AppData\Local\Google\Chrome\User Data\Local State' and 'AppData\Local\Microsoft\Edge\User Data\Local State') and decrypt them using the same type of arguments that can be supplied for `cookies` and `logins`. You may also supply the path to a specific state-key file using the `/target:` parameter (e.g., `"/target:C:\Users\Test\appdata\Local\Google\Chrome\User Data\Local State"`).
 
 State keys can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
