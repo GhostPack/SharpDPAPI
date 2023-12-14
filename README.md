@@ -129,6 +129,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /showall                                        -   show all decrypted private key files, not just ones that are linked to installed certs (the default)
             /machine                                        -   use the local machine store for certificate triage
             /mkfile | /target                               -   for /machine triage
+            /unprotect                                      -   force use of CryptUnprotectData() for user triage
             /pvk | /mkfile | /password | /server | /target  -   for user triage
 
 
@@ -166,7 +167,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /target:FILE        -   triage a specific 'Cookies', 'Login Data', or 'Local State' file location
             /target:C:\Users\X\ -   triage a specific user folder for any specified command
             /server:SERVER      -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
-            /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'edge'
+            /browser:X          -   triage 'chrome' (default), (chromium-based) 'edge', or 'slack'
 
         Output:
             /format:X           -   either 'csv' (default) or 'table' display
@@ -695,7 +696,9 @@ Using `/unprotect` to decrypt any found key material:
 
 The **certificates** command will search user encrypted DPAPI certificate private keys a) decrypt them with any "{GUID}:SHA1" masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) use a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys (a la **masterkeys**), or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
-A specific certificiate can be specified with `/target:C:\Folder\`. In this case, either a) {GUID}:SHA1 values must be supplied or b) the folder must contain DPAPI masterkeys and a /pvk domain backup key must be supplied.
+The `/unprotect` flag will use CryptUnprotectData() to decrypt private keys, *if* the command is run from the user context whose certificates you are trying to access. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
+
+A specific certificate can be specified with `/target:FILE` or `/target:C:\Folder\`. In both cases, {GUID}:SHA1 values (or `/unprotect`) are required or b) the folder must contain DPAPI masterkeys and a /pvk domain backup key must be supplied.
 
 By default, only private keys linkable to an associated installed certificate are displayed. The `/showall` command will display ALL decrypted private keys.
 
@@ -747,6 +750,53 @@ Using domain {GUID}:SHA1 masterkey mappings:
     MIIFujCCBKKgAwIBAgITVQAAAJf6yKyhm5SBVwA...(snip)...
     -----END CERTIFICATE-----
 
+Using `/unprotect` to decrypt any found user certificates:
+
+    C:\Temp> SharpDPAPI.exe certificates /unprotect
+
+      __                 _   _       _ ___
+     (_  |_   _. ._ ._  | \ |_) /\  |_) |
+     __) | | (_| |  |_) |_/ |  /--\ |  _|_
+                    |
+      v1.11.3
+
+
+    [*] Action: Certificate Triage
+
+    [*] Using CryptUnprotectData() for decryption.
+
+
+    Folder       : C:\Users\harmj0y\AppData\Roaming\Microsoft\Crypto\RSA\S-1-5-21-937929760-3187473010-80948926-1104
+
+      File               : f29fa2bb6de62b7d966a407ef203ac45_3fef0615-487e-485b-84b0-193b510dec3b
+
+        Provider GUID    : {df9d8cd0-1501-11d1-8c7a-00c04fc297eb}
+        Master Key GUID  : {27db0044-e2aa-4ea2-b2c0-c469e9b29ed9}
+        Description      : Private Key
+        algCrypt         : CALG_AES_256 (keyLen 256)
+        algHash          : CALG_SHA_512 (32782)
+        Salt             : d7e1e00ed8a6249b5f05c487154e83cc0b51f71131530d0d46d3bfc63d890468
+        HMAC             : 4869f296cdcc964262a57e2efc4f2c5df57c2ed7319e297daa2107810da5c171
+        Unique Name      : {4A07001C-57BE-4E8B-86D1-43CACDF8D448}
+
+        Thumbprint       : BBD9B90FE1A4E37BD646CBC922ABE06C24C1E725
+        Issuer           : CN=theshire-DC-CA, DC=theshire, DC=local
+        Subject          : CN=harmj0y
+        Valid Date       : 10/18/2022 11:40:07 AM
+        Expiry Date      : 10/18/2023 12:00:07 PM
+        Enhanced Key Usages:
+            Client Authentication (1.3.6.1.5.5.7.3.2)
+             [!] Certificate is used for client auth!
+            Server Authentication (1.3.6.1.5.5.7.3.1)
+
+        [*] Private key file f29fa2bb6de62b7d966a407ef203ac45_3fef0615-487e-485b-84b0-193b510dec3b was recovered:
+
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIEowIBAAKCAQEAxVEW49fMt...(snip)...
+    -----END RSA PRIVATE KEY-----
+    -----BEGIN CERTIFICATE-----
+    MIIDKjCCAhKgAwIBAgIQYwhUr...(snip)...
+    -----END CERTIFICATE-----
 
 Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
 
@@ -1297,7 +1347,7 @@ If run from an elevated context, Login Data files for ALL users will be triaged,
 
 ### cookies
 
-The **cookies** command will search for Chrome 'Cookies' files and decrypt cookie values. If execution is in an unelevated contect, CryptProtectData() will automatically be used to try to decrypt values. If `/browser:edge` is specified, the newer Chromium-based Edge browser is triaged.
+The **cookies** command will search for Chromium 'Cookies' files and decrypt cookie values. If execution is in an unelevated contect, CryptProtectData() will automatically be used to try to decrypt values. You can change the target application using the `/browser:<VALUE>` (e.g., edge, brave, slack).
 
 Cookie files can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 
@@ -1311,7 +1361,7 @@ The **cookies** command also has `/cookie:REGEX` and `/url:REGEX` arguments to o
 
 ### statekeys
 
-The **statekeys** command will search for Chrome/Edge AES statekey files (i.e. 'AppData\Local\Google\Chrome\User Data\Local State' and 'AppData\Local\Microsoft\Edge\User Data\Local State') and decrypts them using the same type of arguments that can be supplied for `cookies` and `logins`.
+By default, the **statekeys** command will search for Chromium-based applications (Google Chrome, Edge, Brave, and Slack), locate their AES statekey files (e.g., 'AppData\Local\Google\Chrome\User Data\Local State' and 'AppData\Local\Microsoft\Edge\User Data\Local State'), and decrypt them using the same type of arguments that can be supplied for `cookies` and `logins`. You may also supply the path to a specific state-key file using the `/target:` parameter (e.g., `"/target:C:\Users\Test\appdata\Local\Google\Chrome\User Data\Local State"`).
 
 State keys can also be decrypted with a) any "{GUID}:SHA1 {GUID}:SHA1 ..." masterkeys passed, b) a `/mkfile:FILE` of one or more {GUID}:SHA1 masterkey mappings, c) a supplied DPAPI domain backup key (`/pvk:BASE64...` or `/pvk:key.pvk`) to first decrypt any user masterkeys, or d) a `/password:X` to decrypt any user masterkeys, which are then used as a lookup decryption table. DPAPI GUID mappings can be recovered with Mimikatz' `sekurlsa::dpapi` command.
 

@@ -32,7 +32,6 @@ namespace SharpDPAPI.Commands
             }
             if (arguments.ContainsKey("/pvk"))
             {
-                // use a domain DPAPI backup key to triage masterkeys
                 masterkeys = SharpDPAPI.Dpapi.PVKTriage(arguments);
             }
             else if (arguments.ContainsKey("/mkfile"))
@@ -51,6 +50,11 @@ namespace SharpDPAPI.Commands
                 {
                     masterkeys = Triage.TriageUserMasterKeys(null, true, "", password);
                 }
+            }
+            else if (arguments.ContainsKey("/rpc"))
+            {
+                Console.WriteLine("[*] Will ask domain controller to decrypt masterkey for us\r\n");
+                masterkeys = Triage.TriageUserMasterKeys(null, rpc: true);
             }
 
             if (arguments.ContainsKey("/server") && !arguments.ContainsKey("/pvk") && !arguments.ContainsKey("/password"))

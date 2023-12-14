@@ -53,12 +53,12 @@ namespace SharpChrome
                 // if we have a user folder as the target to triage
                 userDirectories.Add(userFolder);
             }
-            else if(SharpDPAPI.Helpers.IsHighIntegrity())
+            else if (SharpDPAPI.Helpers.IsHighIntegrity())
             {
-                if($"{System.Security.Principal.WindowsIdentity.GetCurrent().User}" == "S-1-5-18")
+                if ($"{System.Security.Principal.WindowsIdentity.GetCurrent().User}" == "S-1-5-18")
                 {
                     // if we're SYSTEM
-                    if(MasterKeys.Count > 0)
+                    if (MasterKeys.Count > 0)
                     {
                         if (!quiet)
                         {
@@ -75,7 +75,7 @@ namespace SharpChrome
                         return;
                     }
                 }
-                else if(MasterKeys.Count == 0)
+                else if (MasterKeys.Count == 0)
                 {
                     // if we're elevated but not SYSTEM, and no masterkeys are supplied, assume we're triaging just the current user
                     if (!quiet)
@@ -107,7 +107,7 @@ namespace SharpChrome
             }
 
 
-            foreach(string userDirectory in userDirectories)
+            foreach (string userDirectory in userDirectories)
             {
                 var loginDataPath = "";
                 var aesStateKeyPath = "";
@@ -238,11 +238,11 @@ namespace SharpChrome
             {
                 var cookiePath = "";
                 var aesStateKeyPath = "";
-                
+
                 if (browser.ToLower() == "chrome")
                 {
                     cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies", userDirectory);
-                    if(!File.Exists(cookiePath))
+                    if (!File.Exists(cookiePath))
                     {
                         cookiePath = String.Format("{0}\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Network\\Cookies", userDirectory);
                     }
@@ -265,6 +265,11 @@ namespace SharpChrome
                         cookiePath = String.Format("{0}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Network\\Cookies", userDirectory);
                     }
                     aesStateKeyPath = String.Format("{0}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State", userDirectory);
+                }
+                else if (browser.ToLower() == "slack")
+                {
+                    cookiePath = String.Format("{0}\\AppData\\Roaming\\Slack\\Network\\Cookies", userDirectory);
+                    aesStateKeyPath = String.Format("{0}\\AppData\\Roaming\\Slack\\Local State", userDirectory);
                 }
                 else
                 {
@@ -289,6 +294,7 @@ namespace SharpChrome
 
         public static void TriageStateKeys(Dictionary<string, string> MasterKeys, string computerName = "", bool unprotect = false, string target = "", string userFolder = "")
         {
+            List<string> aesKeyPaths = new List<string>();
             // triage all Chromium state keys we can reach
 
             List<string> userDirectories = new List<string>();
@@ -312,6 +318,10 @@ namespace SharpChrome
                     string userDirectoryBase = String.Format("\\\\{0}\\C$\\Users\\", computerName);
                     userDirectories.AddRange(Directory.GetDirectories(userDirectoryBase));
                 }
+            }
+            else if (File.Exists(target))
+            {
+                aesKeyPaths.Add(target);
             }
             else if (!String.IsNullOrEmpty(userFolder))
             {
@@ -359,20 +369,18 @@ namespace SharpChrome
 
             foreach (string userDirectory in userDirectories)
             {
-                string[] aesKeyPaths = new string[]
-                {
-                    $"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State",
-                    $"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State",
-                    $"{userDirectory}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State",
-                    $"{userDirectory}\\AppData\\Roaming\\Microsoft\\Teams\\Local State"
-                };
+                aesKeyPaths.Add($"{userDirectory}\\AppData\\Local\\Google\\Chrome\\User Data\\Local State");
+                aesKeyPaths.Add($"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State");
+                aesKeyPaths.Add($"{userDirectory}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State");
+                aesKeyPaths.Add($"{userDirectory}\\AppData\\Roaming\\Slack\\Local State");
+                aesKeyPaths.Add($"{userDirectory}\\AppData\\Roaming\\Microsoft\\Teams\\Local State");
+            }
 
-                foreach(var aesKeyPath in aesKeyPaths)
+            foreach (var aesKeyPath in aesKeyPaths)
+            {
+                if (File.Exists(aesKeyPath))
                 {
-                    if (File.Exists(aesKeyPath))
-                    {
-                        byte[] aesStateKey = GetStateKey(MasterKeys, aesKeyPath, unprotect, false);
-                    }
+                    byte[] aesStateKey = GetStateKey(MasterKeys, aesKeyPath, unprotect, false);
                 }
             }
         }
@@ -417,7 +425,7 @@ namespace SharpChrome
                 Console.WriteLine("\r\n[X] Invalid format: {0}", displayFormat);
                 return;
             }
-            
+
             string query = "SELECT signon_realm, origin_url, username_value, password_value, times_used, cast(date_created as text) as date_created FROM logins";
             List<SQLiteQueryRow> results = database.Query2(query, false);
 
@@ -445,7 +453,8 @@ namespace SharpChrome
                         decBytes = Encoding.ASCII.GetBytes(String.Format("--AES STATE KEY NEEDED--"));
                     }
                 }
-                else {
+                else
+                {
                     // using the old method
                     decBytes = SharpDPAPI.Dpapi.DescribeDPAPIBlob(passwordBytes, MasterKeys, "chrome", unprotect);
                 }
@@ -544,9 +553,9 @@ namespace SharpChrome
 
             // old - fails in some cases due to partial indexing :(
             //string query = "SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, is_secure, is_httponly, cast(last_access_utc as text) as last_access_utc, encrypted_value FROM cookies";
-            
+
             // new, seems to work with partial indexing?? "/giphy table flip"
-            string query = "SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, cast(last_access_utc as text) as last_access_utc, encrypted_value FROM cookies";
+            string query = "SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, cast(last_access_utc as text) as last_access_utc, encrypted_value, samesite, is_secure, is_httponly FROM cookies";
             List<SQLiteQueryRow> results = database.Query2(query, false);
 
             // used if cookies "never expire" for json output
@@ -554,6 +563,7 @@ namespace SharpChrome
             TimeSpan timespan = (DateTime.Now).AddYears(100) - epoch;
             long longExpiration = (long)Math.Abs(timespan.TotalSeconds * 1000000);
 
+            int idInt = 1;
             foreach (SQLiteQueryRow row in results)
             {
                 try
@@ -594,6 +604,41 @@ namespace SharpChrome
                     double expDateDouble = 0;
                     long expDate;
                     Int64.TryParse(row.column[4].Value.ToString(), out expDate);
+                    int sameSite = -1;
+                    int.TryParse(row.column[7].Value.ToString(), out sameSite);
+
+                    if (!int.TryParse(row.column[8].Value.ToString(), out int isSecure))
+                    {
+                        throw new Exception($"Failed to parse int from {row.column[8].Value}");
+                    }
+
+                    string secureFlag = isSecure > 0 ? "true" : "false";
+
+                    if (!int.TryParse(row.column[9].Value.ToString(), out int isHttpOnly))
+                    {
+                        throw new Exception($"Failed to parse int from {row.column[8].Value}");
+                    }
+
+                    string httpOnly = isHttpOnly > 0 ? "true" : "false";
+
+                    string sameSiteString = "";
+                    switch (sameSite)
+                    {
+                        case -1:
+                            sameSiteString = "unspecified";
+                            break;
+                        case 0:
+                            sameSiteString = "no_restriction";
+                            break;
+                        case 1:
+                            sameSiteString = "lax";
+                            break;
+                        case 2:
+                            sameSiteString = "strict";
+                            break;
+                        default:
+                            throw new Exception($"Unexpected SameSite value {sameSite}");
+                    }
                     // https://github.com/djhohnstein/SharpChrome/issues/1
                     if ((expDate / 1000000.000000000000) - 11644473600 > 0)
                         expDateDouble = (expDate / 1000000.000000000000000) - 11644473600;
@@ -627,7 +672,8 @@ namespace SharpChrome
                             }
                         }
                     }
-                    else if (showAll || (expires > DateTime.UtcNow) || (row.column[4].Value.ToString() == "0") || String.IsNullOrEmpty(row.column[4].Value.ToString())) {
+                    else if (showAll || (expires > DateTime.UtcNow) || (row.column[4].Value.ToString() == "0") || String.IsNullOrEmpty(row.column[4].Value.ToString()))
+                    {
                         // if we're showing all, the cookie isn't expired, or the cookie doesn't have an expiration
                         displayValue = true;
                     }
@@ -664,9 +710,9 @@ namespace SharpChrome
                             {
                                 Console.WriteLine("},\r\n{");
                             }
-                            
+
                             someResults = true;
-                            
+
                             Console.WriteLine("    \"domain\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(String.Format("{0}", row.column[1].Value)));
                             if (setneverexpire)
                             {
@@ -679,15 +725,16 @@ namespace SharpChrome
                                     Console.WriteLine("    \"expirationDate\": {0},", expDateDouble);
                                 }
                             }
-                            Console.WriteLine("    \"hostOnly\": false,");
-                            Console.WriteLine("    \"httpOnly\": true,");
+                            Console.WriteLine($"    \"hostOnly\": false,");
+                            Console.WriteLine($"    \"httpOnly\": {httpOnly},");
                             Console.WriteLine("    \"name\": \"{0}\",", SharpDPAPI.Helpers.CleanForJSON(String.Format("{0}", row.column[2].Value)));
                             Console.WriteLine("    \"path\": \"{0}\",", String.Format("{0}", row.column[3].Value));
-                            Console.WriteLine("    \"sameSite\": \"no_restriction\",");
-                            Console.WriteLine("    \"secure\": true,");
+                            Console.WriteLine($"    \"sameSite\": \"{sameSiteString}\",");
+                            Console.WriteLine($"    \"secure\": {secureFlag},");
                             Console.WriteLine("    \"session\": true,");
-                            Console.WriteLine("    \"storeId\": null,");
+                            Console.WriteLine("    \"storeId\": \"0\",");
                             Console.WriteLine("    \"value\": \"{0}\"", SharpDPAPI.Helpers.CleanForJSON(value));
+                            // Console.WriteLine($"    \"");
                         }
                         else
                         {
@@ -718,7 +765,7 @@ namespace SharpChrome
                         }
                     }
                 }
-                catch {}
+                catch { }
             }
 
             if (displayFormat.Equals("json") && someResults)
@@ -740,7 +787,7 @@ namespace SharpChrome
 
             if (startIndex < 0)
                 return "";
-            
+
             int keyIndex = startIndex + searchTerm.Length + 3;
             string tempVals = localStateData.Substring(keyIndex);
 
@@ -825,7 +872,7 @@ namespace SharpChrome
 
                 return stateKey;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 if (($"{e.Message}".Contains("Key not valid for use in specified state")) && (unprotect))
                 {

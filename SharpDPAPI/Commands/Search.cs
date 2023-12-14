@@ -152,7 +152,7 @@ namespace SharpDPAPI.Commands
         private bool FileContainsDpapiBlob(string path, uint bytesToSearch)
         {
             var fileContents = new byte[bytesToSearch];
-            using (var file = new FileStream(path, FileMode.Open))
+            using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
                 file.Read(fileContents, 0, (int)bytesToSearch);
             }
