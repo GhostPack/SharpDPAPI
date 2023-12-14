@@ -851,12 +851,12 @@ namespace SharpDPAPI
 
             if (arguments.ContainsKey("/server"))
             {
-                masterkeys = Triage.TriageUserMasterKeys(backupKeyBytes, false, arguments["/server"]);
+                masterkeys = Triage.TriageUserMasterKeys(backupKeyBytes: backupKeyBytes, show: false, computerName: arguments["/server"]);
             }
             else
             {
                 Console.WriteLine("");
-                masterkeys = Triage.TriageUserMasterKeys(backupKeyBytes, false);
+                masterkeys = Triage.TriageUserMasterKeys(backupKeyBytes: backupKeyBytes, show: false);
             }
 
             if (masterkeys.Count == 0)
@@ -1752,7 +1752,7 @@ namespace SharpDPAPI
             return masterKeySubBytes;
         }
         
-        public static byte[] CalculateKeys(string password, string directory, bool domain, string userSID = "")
+        public static byte[] CalculateKeys(bool domain = true, string password = "", string ntlm = "", string prekey = "",  string userSID = "", string directory = "")
         {
             var usersid = "";
 
@@ -1777,6 +1777,8 @@ namespace SharpDPAPI
 
             if (!domain)
             {
+                // TODO: handle local prekey!
+
                 //Calculate SHA1 from user password
                 using (var sha1 = new SHA1CryptoServiceProvider())
                 {
@@ -1791,43 +1793,67 @@ namespace SharpDPAPI
             }
             else
             {
-                //Calculate NTLM from user password. Kerberos's RC4_HMAC key is the NTLM hash
-                //Skip NTLM hashing if the password is in NTLM format
-                string rc4Hash = Regex.IsMatch(password, "^[a-f0-9]{32}$", RegexOptions.IgnoreCase) ? password : 
-                    Crypto.KerberosPasswordHash(Interop.KERB_ETYPE.rc4_hmac, password);
-
-                var ntlm = Helpers.ConvertHexStringToByteArray(rc4Hash);
-
-                var combinedNTLM = Helpers.Combine(ntlm, utf16sidfinal);
-                byte[] ntlmhmacbytes;
-
-                //Calculate SHA1 of NTLM from user password
-                using (var hmac = new HMACSHA1(ntlm))
+                if (!String.IsNullOrEmpty(password) || !String.IsNullOrEmpty(ntlm))
                 {
-                    ntlmhmacbytes = hmac.ComputeHash(utf16sidfinal);
+                    byte[] ntlmBytes = null;
+
+                    if (!String.IsNullOrEmpty(password))
+                    {
+                        ntlmBytes = Helpers.ConvertHexStringToByteArray(Crypto.KerberosPasswordHash(Interop.KERB_ETYPE.rc4_hmac, password));
+                    }
+                    else if (!String.IsNullOrEmpty(ntlm))
+                    {
+                        ntlmBytes = Helpers.ConvertHexStringToByteArray(ntlm);
+                    }
+
+                    var combinedNTLM = Helpers.Combine(ntlmBytes, utf16sidfinal);
+                    byte[] ntlmhmacbytes;
+
+                    using (var hmac = new HMACSHA1(ntlmBytes))
+                    {
+                        ntlmhmacbytes = hmac.ComputeHash(utf16sidfinal);
+                    }
+
+                    byte[] tmpbytes1;
+                    byte[] tmpbytes2;
+                    byte[] tmpkey3bytes;
+
+                    using (var hMACSHA256 = new HMACSHA256())
+                    {
+                        var deriveBytes = new Pbkdf2(hMACSHA256, ntlmBytes, utf16sid, 10000);
+                        tmpbytes1 = deriveBytes.GetBytes(32, "sha256");
+                    }
+
+                    using (var hMACSHA256 = new HMACSHA256())
+                    {
+                        var deriveBytes = new Pbkdf2(hMACSHA256, tmpbytes1, utf16sid, 1);
+                        tmpbytes2 = deriveBytes.GetBytes(16, "sha256");
+                    }
+
+                    var b = BitConverter.ToString(tmpbytes2).Replace("-", "");
+
+                    using (var hmac = new HMACSHA1(tmpbytes2))
+                    {
+                        tmpkey3bytes = hmac.ComputeHash(utf16sidfinal);
+                    }
+                    return tmpkey3bytes;
                 }
-
-                byte[] tmpbytes1;
-                byte[] tmpbytes2;
-                byte[] tmpkey3bytes;
-
-                using (var hMACSHA256 = new HMACSHA256())
+                else if (!String.IsNullOrEmpty(prekey))
                 {
-                    var deriveBytes = new Pbkdf2(hMACSHA256, ntlm, utf16sid, 10000);
-                    tmpbytes1 = deriveBytes.GetBytes(32, "sha256");
-                }
+                    byte[] tmpkey3bytes;
 
-                using (var hMACSHA256 = new HMACSHA256())
-                {
-                    var deriveBytes = new Pbkdf2(hMACSHA256, tmpbytes1, utf16sid, 1);
-                    tmpbytes2 = deriveBytes.GetBytes(16, "sha256");
-                }
+                    using (var hmac = new HMACSHA1(Helpers.ConvertHexStringToByteArray(prekey)))
+                    {
+                        tmpkey3bytes = hmac.ComputeHash(utf16sidfinal);
+                    }
 
-                using (var hmac = new HMACSHA1(tmpbytes2))
-                {
-                    tmpkey3bytes = hmac.ComputeHash(utf16sidfinal);
+                    return tmpkey3bytes;
                 }
-                return tmpkey3bytes;
+                else
+                {
+                    Console.WriteLine("  [X] CalculateKeys() error: either a /password, /ntlm, or /prekey must be supplied!");
+                    return null;
+                }
             }
         }
 

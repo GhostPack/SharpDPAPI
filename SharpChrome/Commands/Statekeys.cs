@@ -47,16 +47,23 @@ namespace SharpChrome.Commands
             }
             else if (arguments.ContainsKey("/password"))
             {
-                string password = arguments["/password"];
-                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
-                if (arguments.ContainsKey("/server"))
-                {
-                    masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
-                }
-                else
-                {
-                    masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(null, true, "", password);
-                }
+                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", arguments["/password"]);
+                masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(show: true, computerName: server, password: arguments["/password"]);
+            }
+            else if (arguments.ContainsKey("/ntlm"))
+            {
+                Console.WriteLine("[*] Will decrypt user masterkeys with NTLM hash: {0}\r\n", arguments["/ntlm"]);
+                masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(show: true, computerName: server, ntlm: arguments["/ntlm"]);
+            }
+            else if (arguments.ContainsKey("/prekey"))
+            {
+                Console.WriteLine("[*] Will decrypt user masterkeys with PreKey: {0}\r\n", arguments["/prekey"]);
+                masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(show: true, computerName: server, prekey: arguments["/prekey"]);
+            }
+            else if (arguments.ContainsKey("/rpc"))
+            {
+                Console.WriteLine("[*] Will ask a domain controller to decrypt masterkeys for us\r\n");
+                masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(show: true, rpc: true);
             }
 
             if (arguments.ContainsKey("/target"))

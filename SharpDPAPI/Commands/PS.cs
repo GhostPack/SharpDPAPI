@@ -14,6 +14,7 @@ namespace SharpDPAPI.Commands
 
             string target = "";
             bool unprotect = false;         // whether to force CryptUnprotectData()
+            var server = "";
 
             if (arguments.ContainsKey("/unprotect"))
             {
@@ -30,6 +31,11 @@ namespace SharpDPAPI.Commands
             {
                 Console.WriteLine("[X] A /target:<BASE64 | file.bin> must be supplied!");
                 return;
+            }
+
+            if (arguments.ContainsKey("/server"))
+            {
+                server = arguments["/server"];
             }
 
             // {GUID}:SHA1 keys are the only ones that don't start with /
@@ -52,21 +58,23 @@ namespace SharpDPAPI.Commands
             }
             else if (arguments.ContainsKey("/password"))
             {
-                string password = arguments["/password"];
-                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
-                if (arguments.ContainsKey("/server"))
-                {
-                    masterkeys = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
-                }
-                else
-                {
-                    masterkeys = Triage.TriageUserMasterKeys(null, true, "", password);
-                }
+                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", arguments["/password"]);
+                masterkeys = Triage.TriageUserMasterKeys(show: true, computerName: server, password: arguments["/password"]);
+            }
+            else if (arguments.ContainsKey("/ntlm"))
+            {
+                Console.WriteLine("[*] Will decrypt user masterkeys with NTLM hash: {0}\r\n", arguments["/ntlm"]);
+                masterkeys = Triage.TriageUserMasterKeys(show: true, computerName: server, ntlm: arguments["/ntlm"]);
+            }
+            else if (arguments.ContainsKey("/prekey"))
+            {
+                Console.WriteLine("[*] Will decrypt user masterkeys with PreKey: {0}\r\n", arguments["/prekey"]);
+                masterkeys = Triage.TriageUserMasterKeys(show: true, computerName: server, prekey: arguments["/prekey"]);
             }
             else if (arguments.ContainsKey("/rpc"))
             {
-                Console.WriteLine("[*] Will ask domain controller to decrypt masterkey for us\r\n");
-                masterkeys = Triage.TriageUserMasterKeys(null, rpc: true);
+                Console.WriteLine("[*] Will ask a domain controller to decrypt masterkeys for us\r\n");
+                masterkeys = Triage.TriageUserMasterKeys(show: true, rpc: true);
             }
 
             Triage.TriagePSCredFile(masterkeys, target, unprotect);

@@ -13,8 +13,8 @@ namespace SharpDPAPI
 {
     public class Triage
     {
-        public static Dictionary<string, string> TriageUserMasterKeys(byte[] backupKeyBytes, bool show = false, string computerName = "", 
-            string password = "", string target = "", string userSID = "", bool dumpHash = false, bool rpc = false)
+        public static Dictionary<string, string> TriageUserMasterKeys(byte[] backupKeyBytes = null, bool show = false, string computerName = "", 
+            string password = "", string ntlm = "", string prekey = "", string target = "", string userSID = "", bool dumpHash = false, bool rpc = false)
         {
             // triage all *user* masterkeys we can find, decrypting if the backupkey is supplied
             
@@ -27,8 +27,7 @@ namespace SharpDPAPI
                 // if we're targeting specific masterkey files
                 if (((backupKeyBytes == null) || (backupKeyBytes.Length == 0)) && String.IsNullOrEmpty(userSID))
                 {
-                    // currently only backupkey is supported
-                    Console.WriteLine("[X] The masterkey '/target:X' option currently requires '/pvk:BASE64...' or '/password:X'");
+                    Console.WriteLine("[X] The masterkey '/target:X' option currently requires '/pvk:BASE64...', or a SID with a /password, /ntlm, or /prekey");
                     return mappings;
                 }
 
@@ -60,9 +59,9 @@ namespace SharpDPAPI
                                 {
                                     plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
                                 }
-                                else if (!String.IsNullOrEmpty(password) && !String.IsNullOrEmpty(userSID))
+                                else if (!String.IsNullOrEmpty(password) || !String.IsNullOrEmpty(ntlm) || !String.IsNullOrEmpty(prekey))
                                 {
-                                    byte[] hmacBytes = Dpapi.CalculateKeys(password, "", true, userSID);
+                                    byte[] hmacBytes = Dpapi.CalculateKeys(password:password, ntlm:ntlm, prekey:prekey, userSID:userSID);
                                     plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
                                 }
                                 else if (dumpHash)
@@ -91,9 +90,9 @@ namespace SharpDPAPI
                         {
                             plaintextMasterKey = Dpapi.DecryptMasterKey(masterKeyBytes, backupKeyBytes);
                         }
-                        else if (!String.IsNullOrEmpty(password))
+                        else if (!String.IsNullOrEmpty(password) || !String.IsNullOrEmpty(ntlm) || !String.IsNullOrEmpty(prekey))
                         {
-                            byte[] hmacBytes = Dpapi.CalculateKeys(password, "", true, userSID);
+                            byte[] hmacBytes = Dpapi.CalculateKeys(password: password, ntlm: ntlm, prekey: prekey, userSID: userSID);
                             plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
                         }
                         else if (dumpHash)
@@ -164,11 +163,12 @@ namespace SharpDPAPI
                             {
                                 isDomain = true; // means use the NTLM of the user password instead of the SHA1
                             }
+                            userSID = !String.IsNullOrEmpty(userSID) ? userSID : Dpapi.ExtractSidFromPath(file);
                         }
 
-                        if (!String.IsNullOrEmpty(password))
+                        if (!String.IsNullOrEmpty(password) || !String.IsNullOrEmpty(ntlm) || !String.IsNullOrEmpty(prekey))
                         {
-                            hmacBytes = Dpapi.CalculateKeys(password, directory, isDomain);
+                            hmacBytes = Dpapi.CalculateKeys(password: password, ntlm: ntlm, prekey: prekey, userSID: userSID, domain: isDomain);
                         }
 
                         foreach (var file in files)
@@ -188,7 +188,7 @@ namespace SharpDPAPI
                             try
                             {
                                 KeyValuePair<string, string> plaintextMasterKey = default;
-                                if (!String.IsNullOrEmpty(password))
+                                if (!String.IsNullOrEmpty(password) || !String.IsNullOrEmpty(ntlm) || !String.IsNullOrEmpty(prekey))
                                 {
                                     plaintextMasterKey = Dpapi.DecryptMasterKeyWithSha(masterKeyBytes, hmacBytes);
                                 }
@@ -198,7 +198,6 @@ namespace SharpDPAPI
                                 }
                                 else if (dumpHash)
                                 {
-                                    userSID = !String.IsNullOrEmpty(userSID) ? userSID : Dpapi.ExtractSidFromPath(file);
                                     plaintextMasterKey = Dpapi.FormatHash(masterKeyBytes, userSID, isDomain ? 3 : 1);
                                 }
                                 else if(rpc && isDomain)
@@ -238,7 +237,7 @@ namespace SharpDPAPI
                 }
             }
 
-            if (!String.IsNullOrEmpty(password))
+            if (show)
             {
                 if (mappings.Count == 0)
                 {
