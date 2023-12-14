@@ -198,6 +198,7 @@ namespace SharpDPAPI
                                 }
                                 else if (dumpHash)
                                 {
+                                    userSID = Dpapi.ExtractSidFromPath(file);
                                     plaintextMasterKey = Dpapi.FormatHash(masterKeyBytes, userSID, isDomain ? 3 : 1);
                                 }
                                 else if(rpc && isDomain)

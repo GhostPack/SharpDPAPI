@@ -373,6 +373,7 @@ namespace SharpChrome
                 aesKeyPaths.Add($"{userDirectory}\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State");
                 aesKeyPaths.Add($"{userDirectory}\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State");
                 aesKeyPaths.Add($"{userDirectory}\\AppData\\Roaming\\Slack\\Local State");
+                aesKeyPaths.Add($"{userDirectory}\\AppData\\Roaming\\Microsoft\\Teams\\Local State");
             }
 
             foreach (var aesKeyPath in aesKeyPaths)
