@@ -5,6 +5,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.12.0] - 2024-12-14
+
+### Added
+    * Support for local/domain prekey usage for decryption
+    * Slack support to statekeys/cookies commands (@Lee Christensen)
+    * Ability  to specify local state file (@Lee Christensen)
+    * RPC (MS-BKUP) masterkey retrieval (@Kiblyn11)
+    * User-context unprotect option for certificates (@ptr0x1)
+    * Teams statekey support (@fsacer)
+    * Ability to dump hashes in jtr/hashcat format (@rxwx)
+    * HMAC validation to 3DES SHA1 (@rxwx)
+    * SCCM object data parsing (@guervild)
+    * SCCM to machine triage (@subat0mik)
+
+### Fixed
+    * User local admin SID enumeration (@clod81)
+    * FIPS compliant API usage (@Calvin Hedle)
+    * Updated for latest editthiscookie format (@djhohnstein)
+    * String types + code cleanup (@Lee Christensen)
+    * SCCM regex fix (@guervild)
+    * Bug in user SID extraction (@rxwx)
+    * nameof to true name for BCrypt* defs (@djhohnstein)
+
+### Changed
+    * NTLM hash now manually specified with `/ntlm` instead of inferred from `/password`
+    * Backupkey now not line wrapped by default
+
+
 ## [1.11.3] - 2022-06-06
 
 ### Fixed
@@ -43,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * **SharpDPAPI** project
-    * Decrypted null bytes in certificate description fields messing up output 
+    * Decrypted null bytes in certificate description fields messing up output
 
 
 ## [1.10.0] - 2021-02-25

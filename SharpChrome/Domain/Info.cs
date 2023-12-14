@@ -25,19 +25,21 @@ Global arguments for the 'cookies', 'logins', and 'statekeys' commands:
 
     Decryption:
         /unprotect          -   force use of CryptUnprotectData() (default for unprivileged execution)
-        /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
-        GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
-        /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
         /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
         /pvk:key.pvk        -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+        /password:X         -   decrypt the target user's masterkeys using a plaintext password (works remotely)
+        /ntlm:X             -   decrypt the target user's masterkeys using a NTLM hash (works remotely)
+        /prekey:X           -   decrypt the target user's masterkeys using a DPAPI prekey (domain or local SHA1, works remotely)
+        /rpc                -   decrypt the target user's masterkeys by asking domain controller to do so
+        GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
         /statekey:X         -   a decrypted AES state key (from the 'statekey' command)
-    
+
     Targeting:
         /target:FILE        -   triage a specific 'Cookies', 'Login Data', or 'Local State' file location
         /target:C:\Users\X\ -   triage a specific user folder for any specified command
         /server:SERVER      -   triage a remote server, assuming admin access (note: must use with /pvk:KEY)
         /browser:X          -   triage 'chrome' (the default) or (chromium-based) 'edge'/'brave'
-    
+
     Output:
         /format:X           -   either 'csv' (default) or 'table' display
         /showall            -   show Login Data entries with null passwords and expired Cookies instead of filtering (default)
@@ -46,7 +48,7 @@ Global arguments for the 'cookies', 'logins', and 'statekeys' commands:
 
 
 'cookies' command specific arguments:
-    
+
         /cookie:""REGEX""     -   only return cookies where the cookie name matches the supplied regex
         /url:""REGEX""        -   only return cookies where the cookie URL matches the supplied regex
         /format:json        -   output cookie values in an Cookie-Editor JSON import format. Best when used with a regex!
