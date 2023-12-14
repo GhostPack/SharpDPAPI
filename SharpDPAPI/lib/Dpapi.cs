@@ -1752,7 +1752,7 @@ namespace SharpDPAPI
             return masterKeySubBytes;
         }
         
-        public static byte[] CalculateKeys(bool domain = true, string password = "", string ntlm = "", string prekey = "",  string userSID = "", string directory = "")
+        public static byte[] CalculateKeys(bool domain = true, string password = "", string ntlm = "", string credkey = "",  string userSID = "", string directory = "")
         {
             var usersid = "";
 
@@ -1774,10 +1774,10 @@ namespace SharpDPAPI
 
             if (!domain)
             {
-                if (!domain && !String.IsNullOrEmpty(prekey))
+                if (!domain && !String.IsNullOrEmpty(credkey))
                 {
-                    // using the local pre-key specifically
-                    using (var hmac = new HMACSHA1(Helpers.ConvertHexStringToByteArray(prekey)))
+                    // using the local credkey specifically
+                    using (var hmac = new HMACSHA1(Helpers.ConvertHexStringToByteArray(credkey)))
                     {
                         return hmac.ComputeHash(utf16sidfinal);
                     }
@@ -1821,7 +1821,7 @@ namespace SharpDPAPI
                     }
 
                     byte[] tmpbytes;
-                    byte[] prekey_bytes;
+                    byte[] credkey_bytes;
 
                     using (var hMACSHA256 = new HMACSHA256())
                     {
@@ -1832,24 +1832,24 @@ namespace SharpDPAPI
                     using (var hMACSHA256 = new HMACSHA256())
                     {
                         var deriveBytes = new Pbkdf2(hMACSHA256, tmpbytes, utf16sid, 1);
-                        prekey_bytes = deriveBytes.GetBytes(16, "sha256");
+                        credkey_bytes = deriveBytes.GetBytes(16, "sha256");
                     }
 
-                    using (var hmac = new HMACSHA1(prekey_bytes))
+                    using (var hmac = new HMACSHA1(credkey_bytes))
                     {
                         return hmac.ComputeHash(utf16sidfinal);
                     }
                 }
-                else if (!String.IsNullOrEmpty(prekey))
+                else if (!String.IsNullOrEmpty(credkey))
                 {
-                    using (var hmac = new HMACSHA1(Helpers.ConvertHexStringToByteArray(prekey)))
+                    using (var hmac = new HMACSHA1(Helpers.ConvertHexStringToByteArray(credkey)))
                     {
                         return hmac.ComputeHash(utf16sidfinal);
                     }
                 }
                 else
                 {
-                    Console.WriteLine("  [X] CalculateKeys() error: either a /password, /ntlm, or /prekey must be supplied!");
+                    Console.WriteLine("  [X] CalculateKeys() error: either a /password, /ntlm, or /credkey must be supplied!");
                     return null;
                 }
             }

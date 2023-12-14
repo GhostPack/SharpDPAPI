@@ -21,7 +21,7 @@ namespace SharpDPAPI.Commands
             byte[] backupKeyBytes = null;
             string password = "";
             string ntlm = "";
-            string prekey = "";
+            string credkey = "";
             string computerName = "";
             string target = "";
             string sid = "";
@@ -60,9 +60,9 @@ namespace SharpDPAPI.Commands
             {
                 ntlm = arguments["/ntlm"];
             }
-            if (arguments.ContainsKey("/prekey"))
+            if (arguments.ContainsKey("/credkey"))
             {
-                prekey = arguments["/prekey"];
+                credkey = arguments["/credkey"];
             }
             if (arguments.ContainsKey("/sid"))
             {
@@ -79,32 +79,32 @@ namespace SharpDPAPI.Commands
             }
 
             if (
-                (arguments.ContainsKey("/password") || arguments.ContainsKey("/ntlm") || arguments.ContainsKey("/prekey")) 
+                (arguments.ContainsKey("/password") || arguments.ContainsKey("/ntlm") || arguments.ContainsKey("/credkey")) 
                 && arguments.ContainsKey("/target")
                 && !arguments.ContainsKey("/sid"))
             {
-                Console.WriteLine("[X] When using /password, /ntlm, or /prekey with /target:X, a /sid:X (domain user SID) is required!");
+                Console.WriteLine("[X] When using /password, /ntlm, or /credkey with /target:X, a /sid:X (domain user SID) is required!");
                 return;
             }
 
             if (arguments.ContainsKey("/hashes") && arguments.ContainsKey("/target") && !arguments.ContainsKey("/sid"))
             {
-                Console.WriteLine("[X] When using /password, /ntlm, or /prekey with /target:X, a /sid:X (domain user SID) is required!");
+                Console.WriteLine("[X] When using /password, /ntlm, or /credkey with /target:X, a /sid:X (domain user SID) is required!");
                 return;
             }
 
             if (
-                !(arguments.ContainsKey("/password") || arguments.ContainsKey("/ntlm") || arguments.ContainsKey("/prekey"))
+                !(arguments.ContainsKey("/password") || arguments.ContainsKey("/ntlm") || arguments.ContainsKey("/credkey"))
                 && !arguments.ContainsKey("/pvk")
                 && !arguments.ContainsKey("/rpc")
                 && !arguments.ContainsKey("/hashes"))
             {
-                Console.WriteLine("[X] A /pvk:BASE64 domain DPAPI backup key, /rpc, /password, /ntlm, /prekey, or /hashes must be supplied!");
+                Console.WriteLine("[X] A /pvk:BASE64 domain DPAPI backup key, /rpc, /password, /ntlm, /credkey, or /hashes must be supplied!");
                 return;
             }
 
             mappings = Triage.TriageUserMasterKeys( backupKeyBytes: backupKeyBytes, show: show, computerName: computerName,
-                                                    password: password, ntlm: ntlm, prekey: prekey, target: target,
+                                                    password: password, ntlm: ntlm, credkey: credkey, target: target,
                                                     userSID: sid, dumpHash: hashes, rpc: rpc);
         }
     }

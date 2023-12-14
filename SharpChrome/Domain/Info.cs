@@ -29,7 +29,7 @@ Global arguments for the 'cookies', 'logins', and 'statekeys' commands:
         /pvk:key.pvk        -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
         /password:X         -   decrypt the target user's masterkeys using a plaintext password (works remotely)
         /ntlm:X             -   decrypt the target user's masterkeys using a NTLM hash (works remotely)
-        /prekey:X           -   decrypt the target user's masterkeys using a DPAPI prekey (domain or local SHA1, works remotely)
+        /credkey:X          -   decrypt the target user's masterkeys using a DPAPI credkey (domain or local SHA1, works remotely)
         /rpc                -   decrypt the target user's masterkeys by asking domain controller to do so
         GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
         /statekey:X         -   a decrypted AES state key (from the 'statekey' command)

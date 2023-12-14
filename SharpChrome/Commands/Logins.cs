@@ -98,10 +98,10 @@ namespace SharpChrome.Commands
                 Console.WriteLine("[*] Will decrypt user masterkeys with NTLM hash: {0}\r\n", arguments["/ntlm"]);
                 masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(show: true, computerName: server, ntlm: arguments["/ntlm"]);
             }
-            else if (arguments.ContainsKey("/prekey"))
+            else if (arguments.ContainsKey("/credkey"))
             {
-                Console.WriteLine("[*] Will decrypt user masterkeys with PreKey: {0}\r\n", arguments["/prekey"]);
-                masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(show: true, computerName: server, prekey: arguments["/prekey"]);
+                Console.WriteLine("[*] Will decrypt user masterkeys with credkey: {0}\r\n", arguments["/credkey"]);
+                masterkeys = SharpDPAPI.Triage.TriageUserMasterKeys(show: true, computerName: server, credkey: arguments["/credkey"]);
             }
             else if (arguments.ContainsKey("/rpc"))
             {
