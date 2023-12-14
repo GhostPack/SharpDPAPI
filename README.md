@@ -49,7 +49,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
       - [blob](#blob)
       - [backupkey](#backupkey)
       - [search](#search)
-      - [sccm](#sccm)
+      - [SCCM](#sccm)
   - [SharpChrome Commands](#sharpchrome-commands)
     - [logins](#logins)
     - [cookies](#cookies)
@@ -197,6 +197,8 @@ If domain admin (or equivalent) privileges have been obtained, the domain DPAPI 
 
 If DA privileges have not been achieved, using Mimikatz' `sekurlsa::dpapi` command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys (user and SYSTEM) on a given system (tip: running `dpapi::cache` after key extraction will give you a nice table). If you change these keys to a `{GUID1}:SHA1 {GUID2}:SHA1...` type format, they can be supplied to the [credentials](#credentials), [vaults](#vaults), [rdg](#rdg), or [triage](#triage) commands. This lets you triage all Credential files/Vaults on a system for any user who's currently logged in, without having to do file-by-file decrypts.
 
+Alternatively, if you can supply a target user's password, NTLM hash, or DPAPI prekey for user-command with  `/password:X`, `/ntlm:X`, or `/prekey:X` respectively. The `dpapi` field of Mimikatz' `sekurlsa::msv` output for domain users can be used as the `/prekey`, while the `sha1` field of `sekurlsa::msv` output can be used as the `/prekey` for local users.
+
 For decrypting RDG/RDCMan.settings files with the [rdg](#rdg) command, the `/unprotect` flag will use CryptUnprotectData() to decrypt any saved RDP passwords, *if* the command is run from the user context who saved the passwords. This can be done from an _unprivileged_ context, without the need to touch LSASS. For why this approach isn't used for credentials/vaults, see Benjamin's [documentation here](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials#problem).
 
 For machine-specific DPAPI triage, the `machinemasterkeys|machinecredentials|machinevaults|machinetriage` commands will do the machine equivalent of user DPAPI triage. If in an elevated context (that is, you need local administrative rights), SharpDPAPI will elevate to SYSTEM privileges to retrieve the "DPAPI_SYSTEM" LSA secret, which is then used to decrypt any discovered machine DPAPI masterkeys. These keys are then used as lookup tables for machine credentials/vaults/etc.
@@ -207,7 +209,9 @@ For more offensive DPAPI information, [check here](https://www.harmj0y.net/blog/
 
 SharpChrome is a Chrome-specific implementation of SharpDPAPI capable of **cookies** and **logins** decryption/triage. It is built as a separate project in SharpDPAPI because of the size of the SQLite library utilized.
 
-Since Chrome Cookies/Login Data are saved without CRYPTPROTECT_SYSTEM, CryptUnprotectData() is back on the table. If SharpChrome is run from an unelevated contect, it will attempt to decrypt any logins/cookies for the current user using CryptUnprotectData(). A `/pvk:[BASE64|file.pvk]`, {GUID}:SHA1 lookup table, `/password:X`, or `/mkfile:FILE` of {GUID}:SHA1 values can also be used to decrypt values. Also, the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) used (with a few modifications) supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199), meaning that Chrome does not have to be closed/target files do not have to be copied to another location.
+Since Chrome Cookies/Login Data are saved without CRYPTPROTECT_SYSTEM, CryptUnprotectData() is back on the table. If SharpChrome is run from an unelevated contect, it will attempt to decrypt any logins/cookies for the current user using CryptUnprotectData(). A `/pvk:[BASE64|file.pvk]`, {GUID}:SHA1 lookup table, `/password:X`, `/ntlm:X`, `/prekey:X`, or `/mkfile:FILE` of {GUID}:SHA1 values can also be used to decrypt values. Also, the [C# SQL library](https://github.com/akveo/digitsquare/tree/a251a1220ef6212d1bed8c720368435ee1bfdfc2/plugins/com.brodysoft.sqlitePlugin/src/wp) used (with a few modifications) supports [lockless opening](https://github.com/gentilkiwi/mimikatz/pull/199), meaning that Chrome does not have to be closed/target files do not have to be copied to another location.
+
+Alternatively, if you can supply a target user's password, NTLM hash, or DPAPI prekey for user-command with  `/password:X`, `/ntlm:X`, or `/prekey:X` respectively. The `dpapi` field of Mimikatz' `sekurlsa::msv` output for domain users can be used as the `/prekey`, while the `sha1` field of `sekurlsa::msv` output can be used as the `/prekey` for local users.
 
 If Chrome is version 80+, an AES state key is stored in *AppData\Local\Google\Chrome\User Data\Local State* - this key is protected with DPAPI, so we can use CryptUnprotectData()/pvk/masterkey lookup tables to decrypt it. This AES key is then used to protect new cookie and login data entries. This is also the process when `/browser:edge` or `/browser:brave` is specified, for newer Chromium-based Edge browser triage.
 
@@ -262,18 +266,18 @@ The `Preferred` key is also parsed in order to highlight the current preferred m
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
       v1.11.3
-    
-    
+
+
     [*] Action: User DPAPI Masterkey File Triage
-    
+
     [*] Will dump user masterkey hashes
-    
+
     [*] Found MasterKey : C:\Users\admin\AppData\Roaming\Microsoft\Protect\S-1-5-21-1473254003-2681465353-4059813368-1000\28678d89-678a-404f-a197-f4186315c4fa
     [*] Found MasterKey : C:\Users\harmj0y\AppData\Roaming\Microsoft\Protect\S-1-5-21-883232822-274137685-4173207997-1111\3858b304-37e5-48aa-afa2-87aced61921a
     ...(snip)...
 
     [*] Preferred master keys:
-    
+
     C:\Users\admin\AppData\Roaming\Microsoft\Protect\S-1-5-21-1473254003-2681465353-4059813368-1000\28678d89-678a-404f-a197-f4186315c4fa
     C:\Users\harmj0y\AppData\Roaming\Microsoft\Protect\S-1-5-21-883232822-274137685-4173207997-1111\3858b304-37e5-48aa-afa2-87aced61921a
 
@@ -328,7 +332,7 @@ Using domain {GUID}:SHA1 masterkey mappings:
 
 
 Using a domain DPAPI backup key to first decrypt any discoverable masterkeys:
- 
+
     C:\Temp>SharpDPAPI.exe credentials /pvk:HvG1sAAAAAABAAAAAAAAAAAAAAC...(snip)...
 
       __                 _   _       _ ___
@@ -1322,7 +1326,7 @@ The `search` command works by searching for the following bytes, which represent
 0x01, 0x00, 0x00, 0x00, 0xD0, 0x8C, 0x9D, 0xDF, 0x01, 0x15, 0xD1, 0x11, 0x8C, 0x7A, 0x00, 0xC0, 0x4F, 0xC2, 0x97, 0xEB
 ```
 
-The search command has different arguments depending on the data type being scanned. To designate the data type, use the `/type` argument specifying `registry`, `folder`, `file`, or `base64`. If the `/type` argument is not present, the command will search the registry by default. 
+The search command has different arguments depending on the data type being scanned. To designate the data type, use the `/type` argument specifying `registry`, `folder`, `file`, or `base64`. If the `/type` argument is not present, the command will search the registry by default.
 
 When searching the registry with no other arguments, the command will recursively search the HKEY_LOCAL_MACHINE and HKEY_USERS hives. Use `/path` parameter to specify a root to key to search from (e.g. `/path:HKLM\Software`) and use the `/showErrors` argument to display errors that occuring during enumeration.
 
