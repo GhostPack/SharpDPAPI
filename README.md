@@ -70,9 +70,7 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
      __) | | (_| |  |_) |_/ |  /--\ |  _|_
                     |
-      v1.11.3
-
-
+      v1.20.0
 
     Retrieve a domain controller's DPAPI backup key, optionally specifying a DC and output file:
 
@@ -102,19 +100,21 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
             /target:FILE/folder     -   triage a specific masterkey, or a folder full of masterkeys (otherwise triage local masterkeys)
             /pvk:BASE64...          -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
             /pvk:key.pvk            -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
-            /password:X             -   first decrypt the current user's masterkeys using a plaintext password or NTLM hash (works remotely)
+            /password:X             -   first decrypt the current user's masterkeys using a plaintext password (works remotely)
             /server:SERVER          -   triage a remote server, assuming admin access
+            /rpc                    -   attempt to decrypt user masterkeys by asking domaine controller to do so
 
 
         Arguments for the credentials|vaults|rdg|keepass|triage|blob|ps commands:
 
             Decryption:
                 /unprotect          -   force use of CryptUnprotectData() for 'ps', 'rdg', or 'blob' commands
-                /password:X         -   first decrypt the current user's masterkeys using a plaintext password or NTLM hash. Works with any function, as well as remotely.
+                /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
                 GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
                 /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
                 /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
                 /pvk:key.pvk        -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
+                /rpc                    -   attempt to decrypt user masterkeys by asking domaine controller to do so
 
             Targeting:
                 /target:FILE/folder -   triage a specific 'Credentials','.rdg|RDCMan.settings', 'blob', or 'ps' file location, or 'Vault' folder
@@ -156,12 +156,14 @@ SharpDPAPI is licensed under the BSD 3-Clause license.
 
         Decryption:
             /unprotect          -   force use of CryptUnprotectData() (default for unprivileged execution)
-            /password:X         -   first decrypt the current user's masterkeys using a plaintext password. Works with any function, as well as remotely.
-            GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
-            /mkfile:FILE        -   use a file of one or more GUID:SHA1 masterkeys for decryption
             /pvk:BASE64...      -   use a base64'ed DPAPI domain private key file to first decrypt reachable user masterkeys
             /pvk:key.pvk        -   use a DPAPI domain private key file to first decrypt reachable user masterkeys
-            /statekey:X         -   a decrypted AES state key (from the 'statekeys' command)
+            /password:X         -   decrypt the target user's masterkeys using a plaintext password (works remotely)
+            /ntlm:X             -   decrypt the target user's masterkeys using a NTLM hash (works remotely)
+            /prekey:X           -   decrypt the target user's masterkeys using a DPAPI prekey (domain or local SHA1, works remotely)
+            /rpc                -   decrypt the target user's masterkeys by asking domain controller to do so
+            GUID1:SHA1 ...      -   use a one or more GUID:SHA1 masterkeys for decryption
+            /statekey:X         -   a decrypted AES state key (from the 'statekey' command)
 
         Targeting:
             /target:FILE        -   triage a specific 'Cookies', 'Login Data', or 'Local State' file location

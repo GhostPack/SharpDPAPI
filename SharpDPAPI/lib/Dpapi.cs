@@ -1835,8 +1835,6 @@ namespace SharpDPAPI
                         prekey_bytes = deriveBytes.GetBytes(16, "sha256");
                     }
 
-                    var b = BitConverter.ToString(prekey_bytes).Replace("-", "");
-
                     using (var hmac = new HMACSHA1(prekey_bytes))
                     {
                         return hmac.ComputeHash(utf16sidfinal);
