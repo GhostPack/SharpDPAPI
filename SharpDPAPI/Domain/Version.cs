@@ -4,6 +4,6 @@ namespace SharpDPAPI
 {
     public static class Version
     {
-        public static string version = "1.11.3";
+        public static string version = "1.12.0";
     }
 }

@@ -16,6 +16,7 @@ namespace SharpDPAPI.Commands
             byte[] blobBytes;
             bool unprotect = false;         // whether to force CryptUnprotectData()
             byte[] entropy = null;
+            var server = "";
 
             if (arguments.ContainsKey("/unprotect"))
             {
@@ -42,6 +43,11 @@ namespace SharpDPAPI.Commands
                 return;
             }
 
+            if (arguments.ContainsKey("/server"))
+            {
+                server = arguments["/server"];
+            }
+
             // {GUID}:SHA1 keys are the only ones that don't start with /
             Dictionary<string, string> masterkeys = new Dictionary<string, string>();
             foreach (KeyValuePair<string, string> entry in arguments)
@@ -62,21 +68,23 @@ namespace SharpDPAPI.Commands
             }
             else if (arguments.ContainsKey("/password"))
             {
-                string password = arguments["/password"];
-                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
-                if (arguments.ContainsKey("/server"))
-                {
-                    masterkeys = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
-                }
-                else
-                {
-                    masterkeys = Triage.TriageUserMasterKeys(null, true, "", password);
-                }
+                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", arguments["/password"]);
+                masterkeys = Triage.TriageUserMasterKeys(show: true, computerName: server, password: arguments["/password"]);
+            }
+            else if (arguments.ContainsKey("/ntlm"))
+            {
+                Console.WriteLine("[*] Will decrypt user masterkeys with NTLM hash: {0}\r\n", arguments["/ntlm"]);
+                masterkeys = Triage.TriageUserMasterKeys(show: true, computerName: server, ntlm: arguments["/ntlm"]);
+            }
+            else if (arguments.ContainsKey("/prekey"))
+            {
+                Console.WriteLine("[*] Will decrypt user masterkeys with PreKey: {0}\r\n", arguments["/prekey"]);
+                masterkeys = Triage.TriageUserMasterKeys(show: true, computerName: server, prekey: arguments["/prekey"]);
             }
             else if (arguments.ContainsKey("/rpc"))
             {
-                Console.WriteLine("[*] Will ask domain controller to decrypt masterkey for us\r\n");
-                masterkeys = Triage.TriageUserMasterKeys(null, rpc: true);
+                Console.WriteLine("[*] Will ask a domain controller to decrypt masterkeys for us\r\n");
+                masterkeys = Triage.TriageUserMasterKeys(show: true, rpc: true);
             }
 
             if (arguments.ContainsKey("/entropy"))

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.DirectoryServices.ActiveDirectory;
 using System.IO;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using static System.Net.Mime.MediaTypeNames;
@@ -17,10 +18,17 @@ namespace SharpDPAPI.Commands
         {
             Console.WriteLine("\r\n[*] Action: User DPAPI Masterkey File Triage\r\n");
 
-            byte[] backupKeyBytes;
-            string password;
+            byte[] backupKeyBytes = null;
+            string password = "";
+            string ntlm = "";
+            string prekey = "";
+            string computerName = "";
+            string target = "";
+            string sid = "";
+            bool hashes = false;        // true to display the matserkeys as hashes
+            bool rpc = false;           // true to use RPC MS-BKUP for retrieval
+            bool show = true;           // true to show the masterkey results in the Triage code 
             Dictionary<string, string> mappings = new Dictionary<string, string>();
-
 
             if (arguments.ContainsKey("/pvk"))
             {
@@ -33,99 +41,71 @@ namespace SharpDPAPI.Commands
                 {
                     backupKeyBytes = Convert.FromBase64String(pvk64);
                 }
-                if (arguments.ContainsKey("/server"))
-                {
-                    Console.WriteLine("[*] Triaging remote server: {0}\r\n", arguments["/server"]);
-                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true, arguments["/server"]);
-                }
-                else if (arguments.ContainsKey("/target"))
-                {
-                    Console.WriteLine("[*] Triaging masterkey target: {0}\r\n", arguments["/target"]);
-                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true, "", "", arguments["/target"]);
-                }
-                else
-                {
-                    Console.WriteLine();
-                    mappings = Triage.TriageUserMasterKeys(backupKeyBytes, true);
-                }
             }
-            else if (arguments.ContainsKey("/password"))
+
+            if (arguments.ContainsKey("/server"))
+            {
+                computerName = arguments["/server"];
+            }
+            if (arguments.ContainsKey("/target"))
+            {
+                target = arguments["/target"];
+            }
+
+            if (arguments.ContainsKey("/password"))
             {
                 password = arguments["/password"];
-                Console.WriteLine("[*] Will decrypt user masterkeys with password: {0}\r\n", password);
-                if (arguments.ContainsKey("/server"))
-                {
-                    mappings = Triage.TriageUserMasterKeys(null, true, arguments["/server"], password);
-                }
-                else if (arguments.ContainsKey("/target"))
-                {
-                    if (!arguments.ContainsKey("/sid"))
-                    {
-                        Console.WriteLine("[X] When using /password:X with /target:X, a /sid:X (domain user SID) is required!");
-                        return;
-                    }
-                    else {
-                        Console.WriteLine("[*] Triaging masterkey target: {0}\r\n", arguments["/target"]);
-                        mappings = Triage.TriageUserMasterKeys(null, true, "", password, arguments["/target"], arguments["/sid"]);
-                    }
-                }
-                else
-                {
-                    mappings = Triage.TriageUserMasterKeys(null, true, "", password);
-                }
             }
-            else if (arguments.ContainsKey("/hashes"))
+            if (arguments.ContainsKey("/ntlm"))
             {
-                Console.WriteLine("[*] Will dump user masterkey hashes\r\n");
-                if (arguments.ContainsKey("/server"))
-                {
-                    mappings = Triage.TriageUserMasterKeys(null, true, arguments["/server"], "", "", "", true);
-                }
-                else if (arguments.ContainsKey("/target"))
-                {
-                    if (!arguments.ContainsKey("/sid"))
-                    {
-                        Console.WriteLine("[X] When dumping hashes with /target:X, a /sid:X (domain user SID) is required!");
-                        return;
-                    }
-                    else
-                    {
-                        Console.WriteLine("[*] Triaging masterkey target: {0}\r\n", arguments["/target"]);
-                        mappings = Triage.TriageUserMasterKeys(null, true, "", "", arguments["/target"], arguments["/sid"], true);
-                    }
-                }
-                else
-                {
-                    mappings = Triage.TriageUserMasterKeys(null, true, "", "", "", "", true);
-                }
+                ntlm = arguments["/ntlm"];
             }
-            else if (arguments.ContainsKey("/rpc"))
+            if (arguments.ContainsKey("/prekey"))
             {
-                Console.WriteLine("[*] Will ask domain controller to decrypt masterkey for us\r\n");
-                mappings = Triage.TriageUserMasterKeys(null, rpc: true);
+                prekey = arguments["/prekey"];
             }
-            else
+            if (arguments.ContainsKey("/sid"))
             {
-                Console.WriteLine("[X] A /pvk:BASE64 domain DPAPI backup key, /password:X or /hashes must be supplied!");
+                sid = arguments["/sid"];
+            }
+
+            if (arguments.ContainsKey("/hashes"))
+            {
+                hashes = true;
+            }
+            if (arguments.ContainsKey("/rpc"))
+            {
+                rpc = true;
+            }
+
+            if (
+                (arguments.ContainsKey("/password") || arguments.ContainsKey("/ntlm") || arguments.ContainsKey("/prekey")) 
+                && arguments.ContainsKey("/target")
+                && !arguments.ContainsKey("/sid"))
+            {
+                Console.WriteLine("[X] When using /password, /ntlm, or /prekey with /target:X, a /sid:X (domain user SID) is required!");
                 return;
             }
 
-            if (!arguments.ContainsKey("/password"))
+            if (arguments.ContainsKey("/hashes") && arguments.ContainsKey("/target") && !arguments.ContainsKey("/sid"))
             {
-                if (mappings.Count == 0)
-                {
-                    Console.WriteLine("\r\n[!] No master keys decrypted!\r\n");
-                }
-                else
-                {
-                    var message = arguments.ContainsKey("/hashes") ? "hashes" : "cache";
-                    Console.WriteLine("\r\n[*] User master key {0}:\r\n", message);
-                    foreach (KeyValuePair<string, string> kvp in mappings)
-                    {
-                        Console.WriteLine("{0}:{1}", kvp.Key, kvp.Value);
-                    }
-                }
+                Console.WriteLine("[X] When using /password, /ntlm, or /prekey with /target:X, a /sid:X (domain user SID) is required!");
+                return;
             }
+
+            if (
+                !(arguments.ContainsKey("/password") || arguments.ContainsKey("/ntlm") || arguments.ContainsKey("/prekey"))
+                && !arguments.ContainsKey("/pvk")
+                && !arguments.ContainsKey("/rpc")
+                && !arguments.ContainsKey("/hashes"))
+            {
+                Console.WriteLine("[X] A /pvk:BASE64 domain DPAPI backup key, /rpc, /password, /ntlm, /prekey, or /hashes must be supplied!");
+                return;
+            }
+
+            mappings = Triage.TriageUserMasterKeys( backupKeyBytes: backupKeyBytes, show: show, computerName: computerName,
+                                                    password: password, ntlm: ntlm, prekey: prekey, target: target,
+                                                    userSID: sid, dumpHash: hashes, rpc: rpc);
         }
     }
 }
