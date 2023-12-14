@@ -1772,24 +1772,30 @@ namespace SharpDPAPI
             utf16sid.CopyTo(utf16sidfinal, 0);
             utf16sidfinal[utf16sidfinal.Length - 2] = 0x00;
 
-            byte[] sha1bytes_password;
-            byte[] hmacbytes;
-
             if (!domain)
             {
-                // TODO: handle local prekey!
-
-                //Calculate SHA1 from user password
-                using (var sha1 = new SHA1CryptoServiceProvider())
+                if (!domain && !String.IsNullOrEmpty(prekey))
                 {
-                    sha1bytes_password = sha1.ComputeHash(utf16pass);
+                    // using the local pre-key specifically
+                    using (var hmac = new HMACSHA1(Helpers.ConvertHexStringToByteArray(prekey)))
+                    {
+                        return hmac.ComputeHash(utf16sidfinal);
+                    }
                 }
-                var combined = Helpers.Combine(sha1bytes_password, utf16sidfinal);
-                using (var hmac = new HMACSHA1(sha1bytes_password))
+                else
                 {
-                    hmacbytes = hmac.ComputeHash(utf16sidfinal);
+                    // Calculate SHA1 from user password
+                    byte[] sha1bytes_password;
+                    using (var sha1 = new SHA1CryptoServiceProvider())
+                    {
+                        sha1bytes_password = sha1.ComputeHash(utf16pass);
+                    }
+                    var combined = Helpers.Combine(sha1bytes_password, utf16sidfinal);
+                    using (var hmac = new HMACSHA1(sha1bytes_password))
+                    {
+                        return hmac.ComputeHash(utf16sidfinal);
+                    }
                 }
-                return hmacbytes;
             }
             else
             {
@@ -1814,40 +1820,34 @@ namespace SharpDPAPI
                         ntlmhmacbytes = hmac.ComputeHash(utf16sidfinal);
                     }
 
-                    byte[] tmpbytes1;
-                    byte[] tmpbytes2;
-                    byte[] tmpkey3bytes;
+                    byte[] tmpbytes;
+                    byte[] prekey_bytes;
 
                     using (var hMACSHA256 = new HMACSHA256())
                     {
                         var deriveBytes = new Pbkdf2(hMACSHA256, ntlmBytes, utf16sid, 10000);
-                        tmpbytes1 = deriveBytes.GetBytes(32, "sha256");
+                        tmpbytes = deriveBytes.GetBytes(32, "sha256");
                     }
 
                     using (var hMACSHA256 = new HMACSHA256())
                     {
-                        var deriveBytes = new Pbkdf2(hMACSHA256, tmpbytes1, utf16sid, 1);
-                        tmpbytes2 = deriveBytes.GetBytes(16, "sha256");
+                        var deriveBytes = new Pbkdf2(hMACSHA256, tmpbytes, utf16sid, 1);
+                        prekey_bytes = deriveBytes.GetBytes(16, "sha256");
                     }
 
-                    var b = BitConverter.ToString(tmpbytes2).Replace("-", "");
+                    var b = BitConverter.ToString(prekey_bytes).Replace("-", "");
 
-                    using (var hmac = new HMACSHA1(tmpbytes2))
+                    using (var hmac = new HMACSHA1(prekey_bytes))
                     {
-                        tmpkey3bytes = hmac.ComputeHash(utf16sidfinal);
+                        return hmac.ComputeHash(utf16sidfinal);
                     }
-                    return tmpkey3bytes;
                 }
                 else if (!String.IsNullOrEmpty(prekey))
                 {
-                    byte[] tmpkey3bytes;
-
                     using (var hmac = new HMACSHA1(Helpers.ConvertHexStringToByteArray(prekey)))
                     {
-                        tmpkey3bytes = hmac.ComputeHash(utf16sidfinal);
+                        return hmac.ComputeHash(utf16sidfinal);
                     }
-
-                    return tmpkey3bytes;
                 }
                 else
                 {
