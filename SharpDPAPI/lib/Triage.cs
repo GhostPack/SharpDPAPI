@@ -211,7 +211,7 @@ namespace SharpDPAPI
                                     bkrp.Initialize(DCIPAdress.ToString(), System.Environment.UserDomainName);
                                     var keyBytes = bkrp.BackuprKey(SharpDPAPI.Dpapi.GetDomainKey(masterKeyBytes));
                                     var guid = $"{{{Encoding.Unicode.GetString(masterKeyBytes, 12, 72)}}}";
-                                    var sha1 = new SHA1CryptoServiceProvider();
+                                    var sha1 = new SHA1Managed();
                                     var masterKeySha1 = sha1.ComputeHash(keyBytes);
                                     var masterKeySha1Hex = BitConverter.ToString(masterKeySha1).Replace("-", "");
                                     mappings.Add(guid, masterKeySha1Hex);
