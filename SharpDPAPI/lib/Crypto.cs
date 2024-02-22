@@ -74,7 +74,7 @@ namespace SharpDPAPI
                 case 26128: // 26128 == CALG_AES_256
                 {
                     // takes a byte array of ciphertext bytes and a key array, decrypt the blob with AES256
-                    var aesCryptoProvider = new AesCryptoServiceProvider();
+                    var aesCryptoProvider = new AesManaged();
 
                     var ivBytes = new byte[16];
 
@@ -139,7 +139,7 @@ namespace SharpDPAPI
 
                 byte[] bufferI = Helpers.Combine(ipad, saltBytes);
                 
-                using (var sha1 = new SHA1CryptoServiceProvider())
+                using (var sha1 = new SHA1Managed())
                 {
                     var sha1BufferI = sha1.ComputeHash(bufferI);
                     
@@ -182,7 +182,7 @@ namespace SharpDPAPI
 
             if (algHash == 32772)
             {
-                using (var sha1 = new SHA1CryptoServiceProvider())
+                using (var sha1 = new SHA1Managed())
                 {
                     var ipadSHA1bytes = sha1.ComputeHash(ipad);
                     var ppadSHA1bytes = sha1.ComputeHash(opad);
@@ -250,7 +250,7 @@ namespace SharpDPAPI
         {
             // helper to AES decrypt a given blob with optional IV
 
-            var aesCryptoProvider = new AesCryptoServiceProvider();
+            var aesCryptoProvider = new AesManaged();
 
             aesCryptoProvider.Key = key;
             if (IV.Length != 0)
