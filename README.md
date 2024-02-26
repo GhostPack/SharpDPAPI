@@ -1191,7 +1191,7 @@ The `/unprotect` flag will use CryptUnprotectData() to decrypt the blob without 
 
 Decrypt a blob using CryptProtectData() (the `/unprotect` flag):
 
-C:\Temp>SharpDPAPI.exe blob /target:C:\Temp\blob.bin /unprotect
+    C:\Temp>SharpDPAPI.exe blob /target:C:\Temp\blob.bin /unprotect
 
       __                 _   _       _ ___
      (_  |_   _. ._ ._  | \ |_) /\  |_) |
