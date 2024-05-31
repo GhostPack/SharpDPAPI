@@ -13,6 +13,13 @@ namespace SharpDPAPI
 {
     public static class Helpers
     {
+        public static byte[] SubArray(byte[] data, int index, int length)
+        {
+            byte[] result = new byte[length];
+            Array.Copy(data, index, result, 0, length);
+            return result;
+        }
+
         public static void EncodeLength(BinaryWriter stream, int length)
         {
             if (length < 0) throw new ArgumentOutOfRangeException("length", "Length must be non-negative");

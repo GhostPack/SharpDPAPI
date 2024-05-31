@@ -10,6 +10,8 @@ using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
+using static SharpDPAPI.Crypto;
+using HashAlgorithm = SharpDPAPI.Crypto.HashAlgorithm;
 
 namespace SharpDPAPI
 {
@@ -851,6 +853,174 @@ namespace SharpDPAPI
             return masterkeys;
         }
 
+        public static byte[] CreateDPAPIBlob(byte[] plaintext, byte[] masterKey, EncryptionAlgorithm algCrypt, 
+            HashAlgorithm algHash, Guid masterKeyGuid, byte[] entropy = null, string description = "")
+        {
+            var descBytes = string.IsNullOrEmpty(description) ? 
+                new byte[2] : Encoding.Unicode.GetBytes(description);
+
+            var saltBytes = GetRandomBytes(32); // Default salt length (TODO: check)
+            var hmacKeyLen = 0; // Default HMAC key length (TODO: check)
+            var hmac2KeyLen = 32; // Default HMAC2 key length (TODO: check)
+
+            var hmacKey = GetRandomBytes(hmacKeyLen);
+            var hmac2Key = GetRandomBytes(hmac2KeyLen);
+
+            var algHashLen = 0;
+            var algCryptLen = 0;
+            var signLen = 0;
+
+            switch (algCrypt)
+            {
+                case EncryptionAlgorithm.CALG_3DES:
+                    algCryptLen = 192;
+                    break;
+                case EncryptionAlgorithm.CALG_AES_256:
+                    algCryptLen = 256;
+                    break;
+            }
+
+            switch (algHash)
+            {
+                case HashAlgorithm.CALG_SHA1:
+                    algHashLen = 160;
+                    signLen = 20;
+                    break;
+                case HashAlgorithm.CALG_SHA_256:
+                    algHashLen = 256;
+                    signLen = 32;
+                    break;
+                case HashAlgorithm.CALG_SHA_512:
+                    algHashLen = 512;
+                    signLen = 64;
+                    break;
+            }
+
+            // Deriving key
+            var derivedKeyBytes = Crypto.DeriveKey(masterKey, saltBytes, (int)algHash, entropy);
+            var finalKeyBytes = new byte[algCryptLen / 8];
+            Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
+
+            // Encrypting data
+            var encData = EncryptBlob(plaintext, finalKeyBytes, algCrypt, PaddingMode.PKCS7);
+
+            var blobLength = 0;
+            blobLength += 4;                // dwVersion
+            blobLength += 16;               // guidProvider
+            blobLength += 4;                // dwMasterKeyVersion
+            blobLength += 16;               // guidMasterKey
+            blobLength += 4;                // dwFlags
+            blobLength += 4;                // dwDescriptionLen
+            blobLength += descBytes.Length; // szDescription
+            blobLength += 4;                // algCrypt
+            blobLength += 4;                // dwAlgCryptLen
+            blobLength += 4;                // dwSaltLen
+            blobLength += saltBytes.Length; // pbSalt
+            blobLength += 4;                // dwHmacKeyLen
+            blobLength += hmacKey.Length;   // pbHmackKey
+            blobLength += 4;                // algHash
+            blobLength += 4;                // dwAlgHashLen
+            blobLength += 4;                // dwHmac2KeyLen
+            blobLength += hmac2Key.Length;  // pbHmack2Key
+            blobLength += 4;                // dwDataLen
+            blobLength += encData.Length;   // pbData
+            blobLength += 4;                // dwSignLen
+            blobLength += signLen;          // pbSign
+
+            var blobBytes = new byte[blobLength];
+            var offset = 0;
+
+            // Setting version
+            var version = 1;
+            Array.Copy(BitConverter.GetBytes(version), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Provider GUID (df9d8cd0-1501-11d1-8c7a-00c04fc297eb)
+            var providerGuid = new Guid("df9d8cd0-1501-11d1-8c7a-00c04fc297eb");
+            Array.Copy(providerGuid.ToByteArray(), 0, blobBytes, offset, 16);
+            offset += 16;
+
+            // Master key version
+            var masterKeyVersion = 1;
+            Array.Copy(BitConverter.GetBytes(masterKeyVersion), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Master key GUID
+            Array.Copy(masterKeyGuid.ToByteArray(), 0, blobBytes, offset, 16);
+            offset += 16;
+
+            // Flags
+            var flags = 0;
+            Array.Copy(BitConverter.GetBytes(flags), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Description length
+            Array.Copy(BitConverter.GetBytes(descBytes.Length), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Description
+            Array.Copy(descBytes, 0, blobBytes, offset, descBytes.Length);
+            offset += descBytes.Length;
+
+            // Algorithm ID
+            Array.Copy(BitConverter.GetBytes((int)algCrypt), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Algorithm key length
+            Array.Copy(BitConverter.GetBytes(algCryptLen), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Salt length
+            Array.Copy(BitConverter.GetBytes(saltBytes.Length), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Salt
+            Array.Copy(saltBytes, 0, blobBytes, offset, saltBytes.Length);
+            offset += saltBytes.Length;
+
+            // Copying HMAC key length
+            Array.Copy(BitConverter.GetBytes(hmacKeyLen), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // HMAC key
+            Array.Copy(hmacKey, 0, blobBytes, offset, hmacKeyLen);
+            offset += hmacKeyLen;
+
+            // Hash algorithm ID
+            Array.Copy(BitConverter.GetBytes((int)algHash), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Hash length
+            Array.Copy(BitConverter.GetBytes(algHashLen), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // HMAC2 key length
+            Array.Copy(BitConverter.GetBytes(hmac2KeyLen), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // HMAC2 key
+            Array.Copy(hmac2Key, 0, blobBytes, offset, hmac2KeyLen);
+            offset += hmac2KeyLen;
+
+            // Data length
+            Array.Copy(BitConverter.GetBytes(encData.Length), 0, blobBytes, offset, 4);
+            offset += 4;
+
+            // Encrypted data
+            Array.Copy(encData, 0, blobBytes, offset, encData.Length);
+            offset += encData.Length;
+
+            // Sign (HMAC) over the entire blob except for the sign field
+            var signBlob = Helpers.SubArray(blobBytes, 20, offset - 20);
+            var sign = Crypto.DeriveKey(masterKey, hmac2Key, (int)algHash, signBlob, entropy);
+
+            // Copying sign length and sign
+            Array.Copy(BitConverter.GetBytes(signLen), 0, blobBytes, offset, 4);
+            offset += 4;
+            Array.Copy(sign, 0, blobBytes, offset, signLen);
+
+            return blobBytes;
+        }
 
         public static byte[] DescribeDPAPIBlob(byte[] blobBytes, Dictionary<string, string> MasterKeys, string blobType = "credential", bool unprotect = false, byte[] entropy = null)
         {
@@ -904,6 +1074,7 @@ namespace SharpDPAPI
 
             var descLength = BitConverter.ToInt32(blobBytes, offset);
             offset += 4;
+
             var description = Encoding.Unicode.GetString(blobBytes, offset, descLength);
             offset += descLength;
 
@@ -960,7 +1131,8 @@ namespace SharpDPAPI
             if (MasterKeys.ContainsKey(guidString))
             {
                 // if this key is present, decrypt this blob
-                if (algHash == 32782)
+                if (algHash == (int)HashAlgorithm.CALG_SHA1 || algHash == (int)HashAlgorithm.CALG_SHA_256
+                    || algHash == (int)HashAlgorithm.CALG_SHA_512)
                 {
                     // grab the sha1(masterkey) from the cache
                     try
@@ -972,35 +1144,8 @@ namespace SharpDPAPI
                         var finalKeyBytes = new byte[algCryptLen / 8];
                         Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
 
-                        // decrypt the blob with the session key
-                        if (blobType.Equals("chrome"))
-                        {
-                            return Crypto.DecryptBlob(dataBytes, finalKeyBytes, algCrypt, PaddingMode.PKCS7);
-                        }
-                        else
-                        {
-                            return Crypto.DecryptBlob(dataBytes, finalKeyBytes, algCrypt);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine("    [X] Error retrieving GUID:SHA1 from cache {0} : {1}", guidString, e.Message);
-                    }
-                }
-                else if (algHash == 32772)
-                {
-                    try
-                    {
-                        // grab the sha1(masterkey) from the cache
-                        var keyBytes = Helpers.StringToByteArray(MasterKeys[guidString].ToString());
-
-                        // derive the session key
-                        var derivedKeyBytes = Crypto.DeriveKey(keyBytes, saltBytes, algHash, entropy);
-                        var finalKeyBytes = new byte[algCryptLen / 8];
-                        Array.Copy(derivedKeyBytes, finalKeyBytes, algCryptLen / 8);
-
-                        // decrypt the blob with the session key
-                        if (blobType.Equals("chrome"))
+                        // decrypt the blob with the session key (TODO: pretty sure blob w/ AES uses PKCS7)
+                        if (blobType.Equals("chrome") || blobType.Equals("blob"))
                         {
                             return Crypto.DecryptBlob(dataBytes, finalKeyBytes, algCrypt, PaddingMode.PKCS7);
                         }
@@ -2025,6 +2170,29 @@ namespace SharpDPAPI
                 return true;
             }
             return false;
+        }
+
+        private static byte[] ComputeHMAC(byte[] key, byte[] data, int offset, int count, HashAlgorithm algHash)
+        {
+            using (var hmac = CreateHMAC(key, algHash))
+            {
+                return hmac.ComputeHash(data, offset, count);
+            }
+        }
+
+        private static HMAC CreateHMAC(byte[] key, HashAlgorithm algHash)
+        {
+            switch (algHash)
+            {
+                case HashAlgorithm.CALG_SHA1:
+                    return new HMACSHA1(key);
+                case HashAlgorithm.CALG_SHA_256:
+                    return new HMACSHA256(key);
+                case HashAlgorithm.CALG_SHA_512:
+                    return new HMACSHA512(key);
+                default:
+                    throw new ArgumentException("Unsupported hash algorithm.");
+            }
         }
 
         public static KeyValuePair<string, string> FormatHash(byte[] masterKeyBytes, string sid, int context = 3)

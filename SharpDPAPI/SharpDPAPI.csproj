@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>SharpDPAPI</RootNamespace>
     <AssemblyName>SharpDPAPI</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
@@ -72,6 +72,7 @@
     <Compile Include="Commands\Machinemasterkeys.cs" />
     <Compile Include="Commands\Machinetriage.cs" />
     <Compile Include="Commands\Machinevaults.cs" />
+    <Compile Include="Commands\Protect.cs" />
     <Compile Include="Commands\SCCM.cs" />
     <Compile Include="Commands\Search.cs" />
     <Compile Include="Commands\PS.cs" />

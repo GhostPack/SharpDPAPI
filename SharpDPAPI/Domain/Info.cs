@@ -73,7 +73,15 @@ Certificate Triage:
         /machine                                        -   use the local machine store for certificate triage
         /mkfile | /target                               -   for /machine triage
         /pvk | /mkfile | /password | /server | /target  -   for user triage
-    
+
+
+Encryption:
+    Arguments for the 'protect' command:
+        /input                                          -   the input file or base64 encoded string you want to protect using DPAPI
+        /output                                         -   the output file the encrypted blob will be written to
+        /mkfile                                         -   the path to the masterkey file to use for encryption 
+        /password                                       -   the password, or password hash (SHA1 or NTLM) to decrypt the masterkey file
+
 
 Note: in most cases, just use *triage* if you're targeting user DPAPI secrets and *machinetriage* if you're going after SYSTEM DPAPI secrets.
       These functions wrap all the other applicable functions that can be automatically run.

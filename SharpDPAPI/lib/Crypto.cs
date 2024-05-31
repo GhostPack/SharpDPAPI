@@ -3,11 +3,35 @@ using System.Security.Cryptography;
 using System.Runtime.InteropServices;
 using System.ComponentModel;
 using System.IO;
+using System.Collections.Generic;
 
 namespace SharpDPAPI
 {
     public class Crypto
     {
+        public enum EncryptionAlgorithm
+        {
+            CALG_3DES = 26115,
+            CALG_AES_256 = 26128
+        }
+
+        public enum HashAlgorithm
+        {
+            CALG_SHA1 = 32772,
+            CALG_SHA_256 = 32780,
+            CALG_SHA_512 = 32782
+        }
+
+        public static byte[] GetRandomBytes(int length)
+        {
+            using (var rng = new RNGCryptoServiceProvider())
+            {
+                var randomBytes = new byte[length];
+                rng.GetBytes(randomBytes);
+                return randomBytes;
+            }
+        }
+
         public static string KerberosPasswordHash(Interop.KERB_ETYPE etype, string password, string salt = "", int count = 4096)
         {
             // use the internal KERB_ECRYPT HashPassword() function to calculate a password hash of a given etype
@@ -38,15 +62,70 @@ namespace SharpDPAPI
             return BitConverter.ToString(output).Replace("-", "");
         }
 
+        public static byte[] EncryptBlob(byte[] plaintext, byte[] key, 
+            EncryptionAlgorithm algCrypt, PaddingMode padding = PaddingMode.Zeros)
+        {
+            // encrypts a DPAPI blob using 3DES or AES
+
+            switch (algCrypt)
+            {
+                case EncryptionAlgorithm.CALG_3DES:
+                    {
+                        // takes a byte array of plaintext bytes and a key array, encrypt the blob with 3DES
+                        var desCryptoProvider = new TripleDESCryptoServiceProvider();
+
+                        var ivBytes = new byte[8];
+
+                        desCryptoProvider.Key = key;
+                        desCryptoProvider.IV = ivBytes;
+                        desCryptoProvider.Mode = CipherMode.CBC;
+                        desCryptoProvider.Padding = padding;
+                        try
+                        {
+                            var ciphertextBytes = desCryptoProvider.CreateEncryptor()
+                                .TransformFinalBlock(plaintext, 0, plaintext.Length);
+                            return ciphertextBytes;
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("[x] An exception occured: {0}", e);
+                        }
+
+                        return new byte[0];
+                    }
+
+                case EncryptionAlgorithm.CALG_AES_256:
+                    {
+                        // takes a byte array of plaintext bytes and a key array, encrypt the blob with AES256
+                        var aesCryptoProvider = new AesManaged();
+
+                        var ivBytes = new byte[16];
+
+                        aesCryptoProvider.Key = key;
+                        aesCryptoProvider.IV = ivBytes;
+                        aesCryptoProvider.Mode = CipherMode.CBC;
+                        aesCryptoProvider.Padding = padding;
+
+                        var ciphertextBytes = aesCryptoProvider.CreateEncryptor()
+                            .TransformFinalBlock(plaintext, 0, plaintext.Length);
+
+                        return ciphertextBytes;
+                    }
+
+                default:
+                    throw new Exception($"Could not encrypt blob. Unsupported algorithm: {algCrypt}");
+            }
+        }
+
         public static byte[] DecryptBlob(byte[] ciphertext, byte[] key, int algCrypt, PaddingMode padding = PaddingMode.Zeros)
         {
             // decrypts a DPAPI blob using 3DES or AES
 
             // reference: https://docs.microsoft.com/en-us/windows/desktop/seccrypto/alg-id
 
-            switch (algCrypt)
+            switch ((EncryptionAlgorithm)algCrypt)
             {
-                case 26115: // 26115 == CALG_3DES
+                case EncryptionAlgorithm.CALG_3DES:
                 {
                     // takes a byte array of ciphertext bytes and a key array, decrypt the blob with 3DES
                     var desCryptoProvider = new TripleDESCryptoServiceProvider();
@@ -71,7 +150,7 @@ namespace SharpDPAPI
                     return new byte[0];
                 }
 
-                case 26128: // 26128 == CALG_AES_256
+                case EncryptionAlgorithm.CALG_AES_256:
                 {
                     // takes a byte array of ciphertext bytes and a key array, decrypt the blob with AES256
                     var aesCryptoProvider = new AesManaged();
@@ -93,6 +172,75 @@ namespace SharpDPAPI
                     throw new Exception($"Could not decrypt blob. Unsupported algorithm: {algCrypt}");
             }
         }
+        /*
+def CryptSessionKeyWin7(masterkey, nonce, hashAlgo, entropy=None, strongPassword=None):
+    """Computes the decryption key for XP DPAPI blob, given the masterkey and optional information.
+
+    This implementation relies on an RFC compliant HMAC implementation
+    This algorithm is also used when checking the HMAC for integrity after decryption
+
+    :param masterkey: decrypted masterkey (should be 64 bytes long)
+    :param nonce: this is the nonce contained in the blob or the HMAC in the blob (integrity check)
+    :param entropy: this is the optional entropy from CryptProtectData() API
+    :param strongPassword: optional password used for decryption or the blob itself (integrity check)
+    :returns: decryption key
+    :rtype : str
+    """
+    if len(masterkey) > 20:
+        masterkey = hashlib.sha1(masterkey).digest()
+
+    digest = M2Crypto.EVP.HMAC(masterkey, hashAlgo.name)
+    digest.update(nonce)
+    if entropy is not None:
+        digest.update(entropy)
+    if strongPassword is not None:
+        digest.update(strongPassword)
+    return digest.final()
+        */
+
+        public static byte[] DeriveKey(byte[] key, byte[] nonce, int hashAlgorithm, byte[] blob, byte[] entropy = null)
+        {
+            HMAC hmac;
+            switch (hashAlgorithm)
+            {
+                case (int)HashAlgorithm.CALG_SHA1:
+                    hmac = new HMACSHA1(key);
+                    break;
+                case (int)HashAlgorithm.CALG_SHA_256:
+                    hmac = new HMACSHA256(key);
+                    break;
+                case (int)HashAlgorithm.CALG_SHA_512:
+                    hmac = new HMACSHA512(key);
+                    break;
+                default:
+                    throw new Exception($"Unsupported hash algorithm: {hashAlgorithm}");
+            }
+
+            var keyMaterial = new List<byte>();
+            keyMaterial.AddRange(nonce);
+            if (entropy != null)
+            {
+                keyMaterial.AddRange(entropy);
+            }
+            keyMaterial.AddRange(blob);
+
+            return hmac.ComputeHash(keyMaterial.ToArray());
+        }
+
+        /*
+        def CryptDeriveKey(h, cipherAlgo, hashAlgo):
+            """Internal use. Mimics the corresponding native Microsoft function"""
+            if len(h) > hashAlgo.blockSize:
+                h = hashlib.new(hashAlgo.name, h).digest()
+            if len(h) >= cipherAlgo.keyLength:
+                return h
+            h += "\x00" * hashAlgo.blockSize
+            ipad = "".join(chr(ord(h[i]) ^ 0x36) for i in range(hashAlgo.blockSize))
+            opad = "".join(chr(ord(h[i]) ^ 0x5c) for i in range(hashAlgo.blockSize))
+            k = hashlib.new(hashAlgo.name, ipad).digest() + hashlib.new(hashAlgo.name, opad).digest()
+            k = cipherAlgo.do_fixup_key(k)
+            return k
+         */
 
         public static byte[] DeriveKey(byte[] keyBytes, byte[] saltBytes, int algHash, byte[] entropy = null)
         {
@@ -101,10 +249,12 @@ namespace SharpDPAPI
             //Console.WriteLine("[*] key       : {0}", BitConverter.ToString(keyBytes).Replace("-", ""));
             //Console.WriteLine("[*] saltBytes : {0}", BitConverter.ToString(saltBytes).Replace("-", ""));
             //Console.WriteLine("[*] entropy   : {0}", BitConverter.ToString(entropy).Replace("-", ""));
-            //Console.WriteLine("[*] algHash   : {0}", algHash);
+            //Console.WriteLine("[*] algHash   : {0}", (HashAlgorithm)algHash);
 
-            if (algHash == 32782)
+            if (algHash == (int)HashAlgorithm.CALG_SHA_512)
             {
+                // TODO: pretty sure this is wrong. It only calculates the session key but doesn't do derivation
+
                 // calculate the session key -> HMAC(salt) where the sha1(masterkey) is the key
 
                 // 32782 == CALG_SHA_512
@@ -117,7 +267,7 @@ namespace SharpDPAPI
                 {
                     return HMACSha512(keyBytes, saltBytes);
                 }
-            } else if (algHash == 32772)
+            } else if (algHash == (int)HashAlgorithm.CALG_SHA1)
             {
                 // 32772 == CALG_SHA1
 
@@ -156,6 +306,7 @@ namespace SharpDPAPI
             }
             else
             {
+                Console.WriteLine("[!] Unsupported Hash Algorithm");
                 return new byte[0];
             }
         }

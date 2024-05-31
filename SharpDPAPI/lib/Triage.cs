@@ -21,7 +21,7 @@ namespace SharpDPAPI
             if (!String.IsNullOrEmpty(target))
             {
                 // if we're targeting specific masterkey files
-                if (((backupKeyBytes == null) || (backupKeyBytes.Length == 0)) && String.IsNullOrEmpty(userSID))
+                if (((backupKeyBytes == null) || (backupKeyBytes.Length == 0)) && String.IsNullOrEmpty(password))
                 {
                     // currently only backupkey is supported
                     Console.WriteLine("[X] The masterkey '/target:X' option currently requires '/pvk:BASE64...' or '/password:X'");
