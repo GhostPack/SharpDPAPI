@@ -12,7 +12,7 @@ Both Chrome and newer Chromium-based Edge browsers can be triaged with SharpChro
 
 SharpChrome also uses an minimized version of @AArnott's [BCrypt P/Invoke code](https://github.com/AArnott/pinvoke/tree/master/src/BCrypt) released under the MIT License.
 
-If you're unfamiliar with DPAPI, [check out this post](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/) for more background information. For more information on Credentials and Vaults in regards to DPAPI, check out Benjamin's [wiki entry on the subject.](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials)
+If you're unfamiliar with DPAPI, [check out this post](https://blog.harmj0y.net/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/) for more background information. For more information on Credentials and Vaults in regards to DPAPI, check out Benjamin's [wiki entry on the subject.](https://github.com/gentilkiwi/mimikatz/wiki/howto-~-credential-manager-saved-credentials)
 
 [@harmj0y](https://twitter.com/harmj0y) is the primary author of this port.
 
@@ -206,7 +206,7 @@ For decrypting RDG/RDCMan.settings files with the [rdg](#rdg) command, the `/unp
 
 For machine-specific DPAPI triage, the `machinemasterkeys|machinecredentials|machinevaults|machinetriage` commands will do the machine equivalent of user DPAPI triage. If in an elevated context (that is, you need local administrative rights), SharpDPAPI will elevate to SYSTEM privileges to retrieve the "DPAPI_SYSTEM" LSA secret, which is then used to decrypt any discovered machine DPAPI masterkeys. These keys are then used as lookup tables for machine credentials/vaults/etc.
 
-For more offensive DPAPI information, [check here](https://www.harmj0y.net/blog/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/).
+For more offensive DPAPI information, [check here](https://blog.harmj0y.net/redteaming/operational-guidance-for-offensive-user-dpapi-abuse/).
 
 #### SharpChrome
 
