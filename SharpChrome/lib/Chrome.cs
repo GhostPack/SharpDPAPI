@@ -780,15 +780,26 @@ namespace SharpChrome
         public static string GetBase64EncryptedKey(string localStatePath)
         {
             // extracts the base64 encoded encrypted chrome AES state key
+            // quote-wrap the search term in order to handle multiple
+            // JSON keys with "encrypted_key" (e.g., "app_bound_encrypted_key")
             string localStateData = File.ReadAllText(localStatePath);
-            string searchTerm = "encrypted_key";
-
+            string searchTerm = "\"encrypted_key\"";
+            int indexPadding = 2;
             int startIndex = localStateData.IndexOf(searchTerm);
+
+            // if we can't find the quote-wrapped variant, fall back to
+            // the original variant
+            if (startIndex < 0)
+            {
+                searchTerm = "encrypted_key";
+                indexPadding = 3;
+                startIndex = localStateData.IndexOf(searchTerm);
+            }
 
             if (startIndex < 0)
                 return "";
 
-            int keyIndex = startIndex + searchTerm.Length + 3;
+            int keyIndex = startIndex + searchTerm.Length + indexPadding;
             string tempVals = localStateData.Substring(keyIndex);
 
             int stopIndex = tempVals.IndexOf('"');
