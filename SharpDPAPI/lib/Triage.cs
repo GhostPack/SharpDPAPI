@@ -155,6 +155,7 @@ namespace SharpDPAPI
                         var files = Directory.GetFiles(directory);
                         var isDomain = false;
                         byte[] hmacBytes = null;
+                        String currentSID = userSID;
 
                         foreach (var file in files)
                         {
@@ -163,12 +164,12 @@ namespace SharpDPAPI
                             {
                                 isDomain = true; // means use the NTLM of the user password instead of the SHA1
                             }
-                            userSID = !String.IsNullOrEmpty(userSID) ? userSID : Dpapi.ExtractSidFromPath(file);
+                            currentSID = !String.IsNullOrEmpty(userSID) ? userSID : Dpapi.ExtractSidFromPath(file);
                         }
 
                         if (!String.IsNullOrEmpty(password) || !String.IsNullOrEmpty(ntlm) || !String.IsNullOrEmpty(credkey))
                         {
-                            hmacBytes = Dpapi.CalculateKeys(password: password, ntlm: ntlm, credkey: credkey, userSID: userSID, domain: isDomain);
+                            hmacBytes = Dpapi.CalculateKeys(password: password, ntlm: ntlm, credkey: credkey, userSID: currentSID, domain: isDomain);
                         }
 
                         foreach (var file in files)
@@ -198,8 +199,8 @@ namespace SharpDPAPI
                                 }
                                 else if (dumpHash)
                                 {
-                                    userSID = Dpapi.ExtractSidFromPath(file);
-                                    plaintextMasterKey = Dpapi.FormatHash(masterKeyBytes, userSID, isDomain ? 3 : 1);
+                                    currentSID = Dpapi.ExtractSidFromPath(file);
+                                    plaintextMasterKey = Dpapi.FormatHash(masterKeyBytes, currentSID, isDomain ? 3 : 1);
                                 }
                                 else if(rpc && isDomain)
                                 {
